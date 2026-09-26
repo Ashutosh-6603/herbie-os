@@ -5,6 +5,9 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: 900,
     height: 600,
+    webPreferences: {
+      autoplayPolicy: "no-user-gesture-required",
+    },
   });
 
   win.loadFile(path.join(__dirname, "../src/renderer/index.html"));
