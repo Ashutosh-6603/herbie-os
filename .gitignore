@@ -1,13 +1,24 @@
-# Python
-.venv/
-__pycache__/
-*.py[cod]
+# Dependencies
+node_modules/
 
-# Environment / secrets
+# Build output (tsc)
+dist/
+*.tsbuildinfo
+
+# Packaged installers (electron-builder)
+release/
+out/
+
+# Logs
+npm-debug.log*
+*.log
+
+# Environment / secrets (e.g., ANTHROPIC_API_KEY)
 .env
 .env.*
 
 # OS / editor files
 .DS_Store
 Thumbs.db
+desktop.ini
 .vscode/
