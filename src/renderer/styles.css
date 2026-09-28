@@ -1,0 +1,108 @@
+:root {
+  --cyan: #3ee8ff;
+  --cyan-dim: rgba(62, 232, 255, 0.25);
+  --bg: #02070d;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: radial-gradient(circle at center, #06202b 0%, var(--bg) 70%);
+  color: var(--cyan);
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  overflow: hidden;
+}
+
+.hud {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+}
+
+.reactor {
+  position: relative;
+  width: 240px;
+  height: 240px;
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--cyan-dim);
+}
+
+.ring-outer {
+  border-top-color: var(--cyan);
+  border-bottom-color: var(--cyan);
+  box-shadow: 0 0 20px var(--cyan-dim);
+  animation: spin 8s linear infinite;
+}
+
+.ring-middle {
+  inset: 30px;
+  border-left-color: var(--cyan);
+  border-right-color: var(--cyan);
+  animation: spin 5s linear infinite reverse;
+}
+
+.ring-inner {
+  inset: 60px;
+  border-style: dashed;
+  border-color: var(--cyan);
+  animation: spin 12s linear infinite;
+}
+
+.core {
+  position: absolute;
+  inset: 95px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #fff 0%,
+    var(--cyan) 40%,
+    transparent 70%
+  );
+  box-shadow:
+    0 0 40px var(--cyan),
+    0 0 80px var(--cyan-dim);
+  animation: pulse 2.5s ease-in-out infinite;
+}
+
+.status {
+  font-size: 1.4rem;
+  font-weight: 400;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-shadow: 0 0 10px var(--cyan);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
