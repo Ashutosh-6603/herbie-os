@@ -1,7 +1,20 @@
-import { app, BrowserWindow, screen } from "electron";
+import { app, BrowserWindow, ipcMain, screen } from "electron";
 import * as path from "node:path";
 
-function createWindow(): void {
+const ORB_SIZE = 140;
+const ORB_MARGIN = 24;
+
+function getOrbBounds() {
+  const { x, y, width, height } = screen.getPrimaryDisplay().workArea;
+  return {
+    x: x + width - ORB_SIZE - ORB_MARGIN,
+    y: y + height - ORB_SIZE - ORB_MARGIN,
+    width: ORB_SIZE,
+    height: ORB_SIZE,
+  };
+}
+
+function createWindow(): BrowserWindow {
   const { x, y, width, height } = screen.getPrimaryDisplay().bounds;
 
   const win = new BrowserWindow({
@@ -16,6 +29,7 @@ function createWindow(): void {
     alwaysOnTop: true,
     webPreferences: {
       autoplayPolicy: "no-user-gesture-required",
+      preload: path.join(__dirname, "preload.js"),
     },
   });
 
@@ -29,10 +43,20 @@ function createWindow(): void {
   });
 
   win.loadFile(path.join(__dirname, "../src/renderer/index.html"));
+
+  return win;
 }
 
 app.whenReady().then(() => {
-  createWindow();
+  const win = createWindow();
+
+  ipcMain.on("herbie:shrink", () => {
+    win.once("leave-full-screen", () => {
+      win.setBounds(getOrbBounds());
+    });
+    win.setAlwaysOnTop(true, "floating");
+    win.setFullScreen(false);
+  });
 });
 
 app.on("window-all-closed", () => {

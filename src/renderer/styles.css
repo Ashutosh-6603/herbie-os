@@ -26,6 +26,18 @@ body {
   overflow: hidden;
 }
 
+body.orb-mode {
+  background: transparent;
+}
+
+body.orb-mode .status {
+  display: none;
+}
+
+body.orb-mode .reactor {
+  transform: scale(0.5);
+}
+
 .hud {
   height: 100%;
   display: flex;

@@ -6,12 +6,17 @@ function getGreeting() {
   return "Good evening";
 }
 
-function speak(text) {
+function speak(text, onDone) {
   const utterance = new SpeechSynthesisUtterance(text);
+
+  utterance.onend = onDone;
 
   window.speechSynthesis.speak(utterance);
 }
 
 const message = `${getGreeting()}, Ashutosh. Herbie is online.`;
 document.querySelector("h1").textContent = message;
-speak(message);
+speak(message, () => {
+  document.body.classList.add("orb-mode");
+  window.herbie.shrink();
+});
