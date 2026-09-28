@@ -15,13 +15,9 @@ function getOrbBounds() {
 }
 
 function createWindow(): BrowserWindow {
-  const { x, y, width, height } = screen.getPrimaryDisplay().bounds;
-
   const win = new BrowserWindow({
-    x,
-    y,
-    width,
-    height,
+    ...getOrbBounds(),
+    show: false,
     frame: false,
     transparent: true,
     resizable: false,
@@ -33,8 +29,11 @@ function createWindow(): BrowserWindow {
     },
   });
 
-  win.setAlwaysOnTop(true, "screen-saver");
-  win.setFullScreen(true);
+  win.once("ready-to-show", () => {
+    win.setAlwaysOnTop(true, "screen-saver");
+    win.setFullScreen(true);
+    win.show();
+  });
 
   win.webContents.on("before-input-event", (_event, input) => {
     if (input.key === "Escape") {
@@ -51,11 +50,17 @@ app.whenReady().then(() => {
   const win = createWindow();
 
   ipcMain.on("herbie:shrink", () => {
-    win.once("leave-full-screen", () => {
-      win.setBounds(getOrbBounds());
-    });
     win.setAlwaysOnTop(true, "floating");
     win.setFullScreen(false);
+  });
+
+  ipcMain.handle("herbie:get-orb-target", () => {
+    const orb = getOrbBounds();
+    const current = win.getBounds();
+    return {
+      x: orb.x - current.x + ORB_SIZE / 2,
+      y: orb.y - current.y + ORB_SIZE / 2,
+    };
   });
 });
 

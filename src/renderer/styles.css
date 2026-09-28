@@ -16,11 +16,7 @@ body {
 }
 
 body {
-  background: radial-gradient(
-    circle at center,
-    rgba(6, 32, 43, 0.85) 0%,
-    rgba(2, 7, 13, 0.92) 70%
-  );
+  background: transparent;
   color: var(--cyan);
   font-family: "Cascadia Mono", "Consolas", monospace;
   overflow: hidden;
@@ -38,6 +34,54 @@ body.orb-mode .reactor {
   transform: scale(0.5);
 }
 
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(
+    circle at center,
+    rgba(6, 32, 43, 0.85) 0%,
+    rgba(2, 7, 13, 0.92) 70%
+  );
+  transition: opacity 0.6s ease;
+}
+
+body.flying::before,
+body.orb-mode::before {
+  opacity: 0;
+}
+
+.reactor {
+  transition: transform 0.9s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.status {
+  transition: opacity 0.4s ease;
+}
+
+body.flying .status {
+  opacity: 0;
+}
+
+body.flying .reactor {
+  transform: translate(var(--dx), var(--dy)) scale(0.5);
+}
+
+body.orb-mode .reactor {
+  transform: scale(0.5);
+  transition: none;
+}
+
+@keyframes orb-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .hud {
   height: 100%;
   display: flex;
@@ -51,6 +95,29 @@ body.orb-mode .reactor {
   position: relative;
   width: 240px;
   height: 240px;
+  isolation: isolate;
+}
+
+/* Carries the HUD's dark backdrop with the orb once the full-screen one fades */
+.reactor::before {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle closest-side,
+    rgba(6, 32, 43, 0.85) 0%,
+    rgba(2, 7, 13, 0.92) 80%,
+    rgba(2, 7, 13, 0) 100%
+  );
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+body.flying .reactor::before,
+body.orb-mode .reactor::before {
+  opacity: 1;
 }
 
 .ring {
