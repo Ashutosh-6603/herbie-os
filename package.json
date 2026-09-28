@@ -5,7 +5,8 @@
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc",
-    "start": "npm run build && electron ."
+    "start": "npm run build && electron .",
+    "autostart:off": "npm run build && electron . --no-autostart"
   },
   "repository": {
     "type": "git",

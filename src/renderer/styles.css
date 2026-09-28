@@ -22,16 +22,8 @@ body {
   overflow: hidden;
 }
 
-body.orb-mode {
-  background: transparent;
-}
-
 body.orb-mode .status {
   display: none;
-}
-
-body.orb-mode .reactor {
-  transform: scale(0.5);
 }
 
 body::before {
@@ -71,15 +63,6 @@ body.flying .reactor {
 body.orb-mode .reactor {
   transform: scale(0.5);
   transition: none;
-}
-
-@keyframes orb-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 .hud {

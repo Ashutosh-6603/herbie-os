@@ -14,6 +14,18 @@ function getOrbBounds() {
   };
 }
 
+function setAutostart(enabled: boolean): void {
+  const settings = app.isPackaged
+    ? { openAtLogin: enabled }
+    : {
+        openAtLogin: enabled,
+        path: process.execPath,
+        args: [app.getAppPath()],
+      };
+
+  app.setLoginItemSettings(settings);
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     ...getOrbBounds(),
@@ -22,7 +34,6 @@ function createWindow(): BrowserWindow {
     transparent: true,
     resizable: false,
     hasShadow: false,
-    alwaysOnTop: true,
     webPreferences: {
       autoplayPolicy: "no-user-gesture-required",
       preload: path.join(__dirname, "preload.js"),
@@ -47,6 +58,15 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+  // NEW: `npm run autostart:off` removes the startup entry and exits
+  if (process.argv.includes("--no-autostart")) {
+    setAutostart(false);
+    app.quit();
+    return;
+  }
+
+  setAutostart(true); // NEW
+
   const win = createWindow();
 
   ipcMain.on("herbie:shrink", () => {
