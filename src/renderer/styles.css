@@ -63,6 +63,7 @@ body.flying .reactor {
 body.orb-mode .reactor {
   transform: scale(0.5);
   transition: none;
+  cursor: pointer;
 }
 
 .hud {
@@ -171,4 +172,49 @@ body.orb-mode .reactor::before {
     transform: scale(1.05);
     opacity: 1;
   }
+}
+
+/* Pins the orb to the window's bottom-right, so it stays put when the window grows */
+body.orb-mode .hud {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: 140px;
+  height: 140px;
+}
+
+.bar {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+}
+
+body.bar-open .bar {
+  display: flex;
+  align-items: center;
+}
+
+.bar-input {
+  width: 100%;
+  height: 100%;
+  padding: 0 20px;
+  background: rgba(2, 7, 13, 0.85);
+  border: 1px solid var(--cyan-dim);
+  border-radius: 28px;
+  color: var(--cyan);
+  font: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  box-shadow: 0 0 16px var(--cyan-dim);
+}
+
+.bar-input:focus {
+  border-color: var(--cyan);
+}
+
+.bar-input::placeholder {
+  color: rgba(62, 232, 255, 0.5);
 }

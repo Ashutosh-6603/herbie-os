@@ -3,6 +3,9 @@ import * as path from "node:path";
 
 const ORB_SIZE = 140;
 const ORB_MARGIN = 24;
+const BAR_WIDTH = 420;
+const BAR_HEIGHT = 56;
+const BAR_GAP = 12;
 
 function getOrbBounds() {
   const { x, y, width, height } = screen.getPrimaryDisplay().workArea;
@@ -11,6 +14,17 @@ function getOrbBounds() {
     y: y + height - ORB_SIZE - ORB_MARGIN,
     width: ORB_SIZE,
     height: ORB_SIZE,
+  };
+}
+
+function getBarBounds() {
+  const orb = getOrbBounds();
+  const height = ORB_SIZE + BAR_GAP + BAR_HEIGHT;
+  return {
+    x: orb.x + ORB_SIZE - BAR_WIDTH,
+    y: orb.y + ORB_SIZE - height,
+    width: BAR_WIDTH,
+    height,
   };
 }
 
@@ -46,26 +60,19 @@ function createWindow(): BrowserWindow {
     win.show();
   });
 
-  win.webContents.on("before-input-event", (_event, input) => {
-    if (input.key === "Escape") {
-      app.quit();
-    }
-  });
-
   win.loadFile(path.join(__dirname, "../src/renderer/index.html"));
 
   return win;
 }
 
 app.whenReady().then(() => {
-  // NEW: `npm run autostart:off` removes the startup entry and exits
   if (process.argv.includes("--no-autostart")) {
     setAutostart(false);
     app.quit();
     return;
   }
 
-  setAutostart(true); // NEW
+  setAutostart(true);
 
   const win = createWindow();
 
@@ -81,6 +88,19 @@ app.whenReady().then(() => {
       x: orb.x - current.x + ORB_SIZE / 2,
       y: orb.y - current.y + ORB_SIZE / 2,
     };
+  });
+
+  ipcMain.on("herbie:open-bar", () => {
+    win.setBounds(getBarBounds());
+    win.focus();
+  });
+
+  ipcMain.on("herbie:close-bar", () => {
+    win.setBounds(getOrbBounds());
+  });
+
+  ipcMain.on("herbie:quit", () => {
+    app.quit();
   });
 });
 

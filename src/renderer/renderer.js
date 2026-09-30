@@ -50,6 +50,43 @@ async function flyToOrb() {
   window.herbie.shrink();
 }
 
+function openBar() {
+  window.addEventListener(
+    "resize",
+    () => {
+      document.body.classList.add("bar-open");
+      document.querySelector(".bar-input").focus();
+    },
+    { once: true },
+  );
+  window.herbie.openBar();
+}
+
+function closeBar() {
+  document.body.classList.remove("bar-open");
+  window.herbie.closeBar();
+}
+
+document.querySelector(".reactor").addEventListener("click", () => {
+  if (!document.body.classList.contains("orb-mode")) return;
+
+  if (document.body.classList.contains("bar-open")) {
+    closeBar();
+  } else {
+    openBar();
+  }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+
+  if (document.body.classList.contains("bar-open")) {
+    closeBar();
+  } else {
+    window.herbie.quit();
+  }
+});
+
 const message = `${getGreeting()}, Ashutosh. Herbie is online.`;
 document.querySelector("h1").textContent = message;
 speak(message, flyToOrb);
