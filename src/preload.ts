@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld("herbie", {
   openBar: () => ipcRenderer.send("herbie:open-bar"),
   closeBar: () => ipcRenderer.send("herbie:close-bar"),
   quit: () => ipcRenderer.send("herbie:quit"),
+  ask: (prompt: string) => ipcRenderer.invoke("herbie:ask", prompt),
 });

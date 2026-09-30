@@ -7,6 +7,8 @@ function getGreeting() {
 }
 
 function speak(text, onDone) {
+  window.speechSynthesis.cancel();
+
   const utterance = new SpeechSynthesisUtterance(text);
 
   utterance.onend = onDone;
@@ -67,6 +69,37 @@ function closeBar() {
   window.herbie.closeBar();
 }
 
+async function handleAsk(input) {
+  const prompt = input.value.trim();
+  if (!prompt || input.disabled) return;
+
+  input.value = "";
+  input.disabled = true;
+  input.placeholder = "Thinking...";
+
+  try {
+    const reply = await window.herbie.ask(prompt);
+    speak(reply);
+  } catch (err) {
+    console.error(err);
+    // CHANGED: say what actually went wrong
+    const message = String(err?.message ?? "");
+    if (message.includes("OLLAMA_DOWN")) {
+      speak("My local brain isn't running. Please start Ollama.");
+    } else if (message.toLowerCase().includes("timeout")) {
+      speak(
+        "My local brain is taking too long to respond. Try again in a moment.",
+      );
+    } else {
+      speak("Sorry, something went wrong while thinking about that.");
+    }
+  } finally {
+    input.disabled = false;
+    input.placeholder = "Ask Herbie...";
+    input.focus();
+  }
+}
+
 document.querySelector(".reactor").addEventListener("click", () => {
   if (!document.body.classList.contains("orb-mode")) return;
 
@@ -74,6 +107,12 @@ document.querySelector(".reactor").addEventListener("click", () => {
     closeBar();
   } else {
     openBar();
+  }
+});
+
+document.querySelector(".bar-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    handleAsk(e.target);
   }
 });
 
