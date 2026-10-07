@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld("herbie", {
   getOrbTarget: () => ipcRenderer.invoke("herbie:get-orb-target"),
   openBar: () => ipcRenderer.send("herbie:open-bar"),
   closeBar: () => ipcRenderer.send("herbie:close-bar"),
+  setReplyHeight: (height: number) =>
+    ipcRenderer.send("herbie:set-reply-height", height), // NEW
   quit: () => ipcRenderer.send("herbie:quit"),
   ask: (prompt: string) => ipcRenderer.invoke("herbie:ask", prompt),
 });

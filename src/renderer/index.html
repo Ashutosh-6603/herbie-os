@@ -5,12 +5,16 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'" />
     <title>Herbie</title>
     <link rel="stylesheet" href="styles.css" />
-    <script src="./renderer.js" defer></script>
+    <script src="renderer.js" defer></script>
   </head>
   <body>
+    <!-- NEW: Herbie's answer appears here, above the bar -->
+    <div class="reply"></div>
+
     <div class="bar">
       <input class="bar-input" type="text" placeholder="Ask Herbie..." />
     </div>
+
     <div class="hud">
       <div class="reactor">
         <div class="ring ring-outer"></div>

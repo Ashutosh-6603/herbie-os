@@ -6,10 +6,12 @@ const ORB_MARGIN = 24;
 const BAR_WIDTH = 420;
 const BAR_HEIGHT = 56;
 const BAR_GAP = 12;
+const REPLY_GAP = 12; // NEW: space between the bar and the reply panel
+const MAX_REPLY_HEIGHT = 240; // NEW: must match .reply max-height in styles.css
 
-const OLLAMA_BASE_URL = "http://localhost:11434"; // CHANGED: base URL, endpoints added per call
+const OLLAMA_BASE_URL = "http://localhost:11434";
 const OLLAMA_MODEL = "llama3.2";
-const OLLAMA_KEEP_ALIVE = "30m"; // NEW
+const OLLAMA_KEEP_ALIVE = "30m";
 const MAX_PROMPT_LENGTH = 2000;
 const SYSTEM_PROMPT =
   "You are Herbie, a helpful desktop assistant. Keep answers short, " +
@@ -25,9 +27,14 @@ function getOrbBounds() {
   };
 }
 
-function getBarBounds() {
+// CHANGED: takes the reply panel's height and grows the window to fit it
+function getBarBounds(replyHeight: number) {
   const orb = getOrbBounds();
-  const height = ORB_SIZE + BAR_GAP + BAR_HEIGHT;
+  const height =
+    ORB_SIZE +
+    BAR_GAP +
+    BAR_HEIGHT +
+    (replyHeight > 0 ? REPLY_GAP + replyHeight : 0);
   return {
     x: orb.x + ORB_SIZE - BAR_WIDTH,
     y: orb.y + ORB_SIZE - height,
@@ -36,7 +43,6 @@ function getBarBounds() {
   };
 }
 
-// NEW: is Ollama running and reachable?
 async function isOllamaUp(): Promise<boolean> {
   try {
     const response = await fetch(`${OLLAMA_BASE_URL}/api/version`, {
@@ -48,7 +54,6 @@ async function isOllamaUp(): Promise<boolean> {
   }
 }
 
-// NEW: load the model into GPU memory in the background, so the first question is fast
 async function warmUpOllama(): Promise<void> {
   try {
     await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
@@ -69,13 +74,12 @@ async function warmUpOllama(): Promise<void> {
 
 async function askOllama(prompt: string): Promise<string> {
   const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
-    // CHANGED: uses base URL
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model: OLLAMA_MODEL,
       stream: false,
-      keep_alive: OLLAMA_KEEP_ALIVE, // NEW
+      keep_alive: OLLAMA_KEEP_ALIVE,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: prompt },
@@ -140,7 +144,7 @@ app.whenReady().then(() => {
 
   const win = createWindow();
 
-  warmUpOllama(); // NEW: runs in the background, not awaited
+  warmUpOllama();
 
   ipcMain.on("herbie:shrink", () => {
     win.setAlwaysOnTop(true, "floating");
@@ -157,12 +161,23 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on("herbie:open-bar", () => {
-    win.setBounds(getBarBounds());
+    win.setBounds(getBarBounds(0)); // CHANGED: opens with no reply panel
     win.focus();
   });
 
   ipcMain.on("herbie:close-bar", () => {
     win.setBounds(getOrbBounds());
+  });
+
+  // NEW: grow or shrink the window to fit the reply panel
+  ipcMain.on("herbie:set-reply-height", (_event, height: unknown) => {
+    if (typeof height !== "number" || !Number.isFinite(height)) return;
+
+    const safeHeight = Math.min(
+      Math.max(Math.round(height), 0),
+      MAX_REPLY_HEIGHT,
+    );
+    win.setBounds(getBarBounds(safeHeight));
   });
 
   ipcMain.on("herbie:quit", () => {
@@ -178,7 +193,6 @@ app.whenReady().then(() => {
       throw new Error("Invalid prompt");
     }
 
-    // NEW: fail fast with a clear reason if Ollama isn't running
     if (!(await isOllamaUp())) {
       throw new Error("OLLAMA_DOWN");
     }

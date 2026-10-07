@@ -1,6 +1,7 @@
+let currentReplyHeight = 0; // NEW: tracks the reply panel's last height
+
 function getGreeting() {
   const hour = new Date().getHours();
-
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
@@ -8,11 +9,8 @@ function getGreeting() {
 
 function speak(text, onDone) {
   window.speechSynthesis.cancel();
-
   const utterance = new SpeechSynthesisUtterance(text);
-
   utterance.onend = onDone;
-
   window.speechSynthesis.speak(utterance);
 }
 
@@ -52,6 +50,36 @@ async function flyToOrb() {
   window.herbie.shrink();
 }
 
+// NEW: show text in the reply panel, growing the window to fit
+function showReply(text) {
+  const reply = document.querySelector(".reply");
+  reply.textContent = text;
+  reply.classList.remove("ready");
+  document.body.classList.add("has-reply");
+
+  const height = reply.offsetHeight;
+
+  if (height === currentReplyHeight) {
+    reply.classList.add("ready");
+    return;
+  }
+
+  currentReplyHeight = height;
+  window.addEventListener("resize", () => reply.classList.add("ready"), {
+    once: true,
+  });
+  window.herbie.setReplyHeight(height);
+}
+
+// NEW: empty and hide the reply panel
+function clearReply() {
+  const reply = document.querySelector(".reply");
+  reply.textContent = "";
+  reply.classList.remove("ready");
+  document.body.classList.remove("has-reply");
+  currentReplyHeight = 0;
+}
+
 function openBar() {
   window.addEventListener(
     "resize",
@@ -65,10 +93,24 @@ function openBar() {
 }
 
 function closeBar() {
+  clearReply(); // NEW: a closed bar starts fresh next time
   document.body.classList.remove("bar-open");
   window.herbie.closeBar();
 }
 
+// NEW: turn an error into a message Herbie can show and say
+function getErrorMessage(err) {
+  const message = String(err?.message ?? "");
+  if (message.includes("OLLAMA_DOWN")) {
+    return "My local brain isn't running. Please start Ollama.";
+  }
+  if (message.toLowerCase().includes("timeout")) {
+    return "My local brain is taking too long to respond. Try again in a moment.";
+  }
+  return "Sorry, something went wrong while thinking about that.";
+}
+
+// CHANGED: shows "Thinking...", then the reply or error, in the panel
 async function handleAsk(input) {
   const prompt = input.value.trim();
   if (!prompt || input.disabled) return;
@@ -76,23 +118,17 @@ async function handleAsk(input) {
   input.value = "";
   input.disabled = true;
   input.placeholder = "Thinking...";
+  showReply("Thinking...");
 
   try {
     const reply = await window.herbie.ask(prompt);
+    showReply(reply);
     speak(reply);
   } catch (err) {
     console.error(err);
-    // CHANGED: say what actually went wrong
-    const message = String(err?.message ?? "");
-    if (message.includes("OLLAMA_DOWN")) {
-      speak("My local brain isn't running. Please start Ollama.");
-    } else if (message.toLowerCase().includes("timeout")) {
-      speak(
-        "My local brain is taking too long to respond. Try again in a moment.",
-      );
-    } else {
-      speak("Sorry, something went wrong while thinking about that.");
-    }
+    const message = getErrorMessage(err);
+    showReply(message);
+    speak(message);
   } finally {
     input.disabled = false;
     input.placeholder = "Ask Herbie...";
