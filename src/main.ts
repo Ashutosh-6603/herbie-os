@@ -54,9 +54,10 @@ async function isOllamaUp(): Promise<boolean> {
   }
 }
 
-async function warmUpOllama(): Promise<void> {
+// CHANGED: now returns whether the model actually loaded
+async function warmUpOllama(): Promise<boolean> {
   try {
-    await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -66,9 +67,17 @@ async function warmUpOllama(): Promise<void> {
       }),
       signal: AbortSignal.timeout(120_000),
     });
+
+    if (!response.ok) {
+      console.error(`Ollama warm-up failed: HTTP ${response.status}`);
+      return false;
+    }
+
     console.log("Ollama warm-up complete");
+    return true;
   } catch (err) {
     console.error("Ollama warm-up failed:", err);
+    return false;
   }
 }
 
@@ -144,7 +153,9 @@ app.whenReady().then(() => {
 
   const win = createWindow();
 
-  warmUpOllama();
+  const brainReady = warmUpOllama();
+
+  ipcMain.handle("herbie:wait-for-brain", () => brainReady);
 
   ipcMain.on("herbie:shrink", () => {
     win.setAlwaysOnTop(true, "floating");

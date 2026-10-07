@@ -1,4 +1,5 @@
-let currentReplyHeight = 0; // NEW: tracks the reply panel's last height
+let currentReplyHeight = 0;
+let hasAsked = false;
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -50,7 +51,6 @@ async function flyToOrb() {
   window.herbie.shrink();
 }
 
-// NEW: show text in the reply panel, growing the window to fit
 function showReply(text) {
   const reply = document.querySelector(".reply");
   reply.textContent = text;
@@ -71,7 +71,6 @@ function showReply(text) {
   window.herbie.setReplyHeight(height);
 }
 
-// NEW: empty and hide the reply panel
 function clearReply() {
   const reply = document.querySelector(".reply");
   reply.textContent = "";
@@ -93,12 +92,11 @@ function openBar() {
 }
 
 function closeBar() {
-  clearReply(); // NEW: a closed bar starts fresh next time
+  clearReply();
   document.body.classList.remove("bar-open");
   window.herbie.closeBar();
 }
 
-// NEW: turn an error into a message Herbie can show and say
 function getErrorMessage(err) {
   const message = String(err?.message ?? "");
   if (message.includes("OLLAMA_DOWN")) {
@@ -110,11 +108,11 @@ function getErrorMessage(err) {
   return "Sorry, something went wrong while thinking about that.";
 }
 
-// CHANGED: shows "Thinking...", then the reply or error, in the panel
 async function handleAsk(input) {
   const prompt = input.value.trim();
   if (!prompt || input.disabled) return;
 
+  hasAsked = true;
   input.value = "";
   input.disabled = true;
   input.placeholder = "Thinking...";
@@ -162,6 +160,21 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+async function announceBrain() {
+  const ready = await window.herbie.waitForBrain();
+  if (hasAsked) return;
+
+  speak(
+    ready
+      ? "My local brain is online. Ask me anything."
+      : "I couldn't start my local brain. Please check that Ollama is running.",
+  );
+}
+
 const message = `${getGreeting()}, Ashutosh. Herbie is online.`;
 document.querySelector("h1").textContent = message;
-speak(message, flyToOrb);
+
+speak(message, () => {
+  flyToOrb();
+  announceBrain();
+});
