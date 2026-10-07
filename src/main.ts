@@ -6,16 +6,26 @@ const ORB_MARGIN = 24;
 const BAR_WIDTH = 420;
 const BAR_HEIGHT = 56;
 const BAR_GAP = 12;
-const REPLY_GAP = 12; // NEW: space between the bar and the reply panel
-const MAX_REPLY_HEIGHT = 240; // NEW: must match .reply max-height in styles.css
+const REPLY_GAP = 12;
+const MAX_REPLY_HEIGHT = 240;
 
 const OLLAMA_BASE_URL = "http://localhost:11434";
 const OLLAMA_MODEL = "llama3.2";
 const OLLAMA_KEEP_ALIVE = "30m";
 const MAX_PROMPT_LENGTH = 2000;
+const USER_NAME = "Ashutosh";
+const MAX_HISTORY_MESSAGES = 20;
 const SYSTEM_PROMPT =
-  "You are Herbie, a helpful desktop assistant. Keep answers short, " +
-  "one to three sentences, because they are spoken aloud.";
+  `You are Herbie, a helpful desktop assistant for ${USER_NAME}. ` +
+  "Keep answers short, one to three sentences, because they are spoken aloud. " +
+  "Don't end your answers with follow-up questions unless you need more information.";
+
+type ChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
+
+const history: ChatMessage[] = [];
 
 function getOrbBounds() {
   const { x, y, width, height } = screen.getPrimaryDisplay().workArea;
@@ -27,7 +37,6 @@ function getOrbBounds() {
   };
 }
 
-// CHANGED: takes the reply panel's height and grows the window to fit it
 function getBarBounds(replyHeight: number) {
   const orb = getOrbBounds();
   const height =
@@ -54,7 +63,6 @@ async function isOllamaUp(): Promise<boolean> {
   }
 }
 
-// CHANGED: now returns whether the model actually loaded
 async function warmUpOllama(): Promise<boolean> {
   try {
     const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
@@ -81,7 +89,7 @@ async function warmUpOllama(): Promise<boolean> {
   }
 }
 
-async function askOllama(prompt: string): Promise<string> {
+async function askOllama(messages: ChatMessage[]): Promise<string> {
   const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -89,10 +97,7 @@ async function askOllama(prompt: string): Promise<string> {
       model: OLLAMA_MODEL,
       stream: false,
       keep_alive: OLLAMA_KEEP_ALIVE,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: prompt },
-      ],
+      messages,
     }),
     signal: AbortSignal.timeout(30_000),
   });
@@ -157,6 +162,8 @@ app.whenReady().then(() => {
 
   ipcMain.handle("herbie:wait-for-brain", () => brainReady);
 
+  ipcMain.handle("herbie:get-user-name", () => USER_NAME);
+
   ipcMain.on("herbie:shrink", () => {
     win.setAlwaysOnTop(true, "floating");
     win.setFullScreen(false);
@@ -172,7 +179,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on("herbie:open-bar", () => {
-    win.setBounds(getBarBounds(0)); // CHANGED: opens with no reply panel
+    win.setBounds(getBarBounds(0));
     win.focus();
   });
 
@@ -180,7 +187,6 @@ app.whenReady().then(() => {
     win.setBounds(getOrbBounds());
   });
 
-  // NEW: grow or shrink the window to fit the reply panel
   ipcMain.on("herbie:set-reply-height", (_event, height: unknown) => {
     if (typeof height !== "number" || !Number.isFinite(height)) return;
 
@@ -208,8 +214,19 @@ app.whenReady().then(() => {
       throw new Error("OLLAMA_DOWN");
     }
 
-    console.log(`You: ${prompt}`);
-    const reply = await askOllama(prompt.trim());
+    const question: ChatMessage = { role: "user", content: prompt.trim() };
+    const reply = await askOllama([
+      { role: "system", content: SYSTEM_PROMPT },
+      ...history,
+      question,
+    ]);
+
+    history.push(question, { role: "assistant", content: reply });
+    if (history.length > MAX_HISTORY_MESSAGES) {
+      history.splice(0, history.length - MAX_HISTORY_MESSAGES);
+    }
+
+    console.log(`You: ${question.content}`);
     console.log(`Herbie: ${reply}`);
     return reply;
   });

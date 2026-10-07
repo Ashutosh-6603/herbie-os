@@ -100,10 +100,10 @@ function closeBar() {
 function getErrorMessage(err) {
   const message = String(err?.message ?? "");
   if (message.includes("OLLAMA_DOWN")) {
-    return "My local brain isn't running. Please start Ollama.";
+    return "I am having some error connecting to Ollama. Please check that it is running.";
   }
   if (message.toLowerCase().includes("timeout")) {
-    return "My local brain is taking too long to respond. Try again in a moment.";
+    return "It is taking too long to respond. Try again in a moment.";
   }
   return "Sorry, something went wrong while thinking about that.";
 }
@@ -166,15 +166,20 @@ async function announceBrain() {
 
   speak(
     ready
-      ? "My local brain is online. Ask me anything."
+      ? "What do you have in mind? You can ask me anything."
       : "I couldn't start my local brain. Please check that Ollama is running.",
   );
 }
 
-const message = `${getGreeting()}, Ashutosh. Herbie is online.`;
-document.querySelector("h1").textContent = message;
+async function start() {
+  const name = await window.herbie.getUserName();
+  const message = `${getGreeting()}, ${name}. Herbie is online.`;
+  document.querySelector("h1").textContent = message;
 
-speak(message, () => {
-  flyToOrb();
-  announceBrain();
-});
+  speak(message, () => {
+    flyToOrb();
+    announceBrain();
+  });
+}
+
+start();

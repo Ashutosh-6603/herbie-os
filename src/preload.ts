@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld("herbie", {
     ipcRenderer.send("herbie:set-reply-height", height),
   quit: () => ipcRenderer.send("herbie:quit"),
   ask: (prompt: string) => ipcRenderer.invoke("herbie:ask", prompt),
-  waitForBrain: () => ipcRenderer.invoke("herbie:wait-for-brain"), // NEW
+  waitForBrain: () => ipcRenderer.invoke("herbie:wait-for-brain"),
+  getUserName: () => ipcRenderer.invoke("herbie:get-user-name"), // NEW
 });
