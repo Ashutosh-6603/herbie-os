@@ -10,5 +10,8 @@ contextBridge.exposeInMainWorld("herbie", {
   quit: () => ipcRenderer.send("herbie:quit"),
   ask: (prompt: string) => ipcRenderer.invoke("herbie:ask", prompt),
   waitForBrain: () => ipcRenderer.invoke("herbie:wait-for-brain"),
-  getUserName: () => ipcRenderer.invoke("herbie:get-user-name"), // NEW
+  getUserName: () => ipcRenderer.invoke("herbie:get-user-name"),
+  onPushToTalk: (callback: (state: "down" | "up") => void) => {
+    ipcRenderer.on("herbie:push-to-talk", (_event, state) => callback(state));
+  },
 });

@@ -245,3 +245,14 @@ body.bar-open.has-reply .reply {
 .reply.ready {
   visibility: visible;
 }
+
+body.listening .core {
+  animation-duration: 0.6s;
+  box-shadow:
+    0 0 60px var(--cyan),
+    0 0 120px var(--cyan);
+}
+
+body.listening .ring-outer {
+  border-color: var(--cyan);
+}

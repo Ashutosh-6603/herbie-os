@@ -204,6 +204,11 @@ function primeSpeech() {
   });
 }
 
+window.herbie.onPushToTalk((state) => {
+  document.body.classList.toggle("listening", state === "down");
+  console.log(`Push-to-talk: ${state}`);
+});
+
 async function start() {
   await keepAudioAwake();
   await primeSpeech();

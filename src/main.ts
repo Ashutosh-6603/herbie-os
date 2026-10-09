@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, screen } from "electron";
 import * as path from "node:path";
+import { uIOhook, UiohookKey } from "uiohook-napi";
 
 const ORB_SIZE = 140;
 const ORB_MARGIN = 24;
@@ -16,6 +17,8 @@ const OLLAMA_CONTEXT = 16384;
 const MAX_PROMPT_LENGTH = 2000;
 const USER_NAME = "Ashutosh";
 const MAX_HISTORY_MESSAGES = 60;
+const PUSH_TO_TALK_KEY = UiohookKey.CtrlRight;
+
 const SYSTEM_PROMPT =
   `You are Herbie, a helpful desktop assistant for ${USER_NAME}. ` +
   "Keep answers short, one to three sentences, because they are spoken aloud. " +
@@ -166,6 +169,26 @@ app.whenReady().then(() => {
   ipcMain.handle("herbie:wait-for-brain", () => brainReady);
 
   ipcMain.handle("herbie:get-user-name", () => USER_NAME);
+
+  let pushToTalkHeld = false;
+
+  uIOhook.on("keydown", (e) => {
+    if (e.keycode !== PUSH_TO_TALK_KEY || pushToTalkHeld) return;
+    pushToTalkHeld = true;
+    win.webContents.send("herbie:push-to-talk", "down");
+  });
+
+  uIOhook.on("keyup", (e) => {
+    if (e.keycode !== PUSH_TO_TALK_KEY || !pushToTalkHeld) return;
+    pushToTalkHeld = false;
+    win.webContents.send("herbie:push-to-talk", "up");
+  });
+
+  uIOhook.start();
+
+  app.on("will-quit", () => {
+    uIOhook.stop();
+  });
 
   ipcMain.on("herbie:shrink", () => {
     win.setAlwaysOnTop(true, "floating");

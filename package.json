@@ -21,5 +21,8 @@
     "@types/node": "^24.19.0",
     "electron": "^44.4.5",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "uiohook-napi": "^1.5.5"
   }
 }
