@@ -1,5 +1,7 @@
 let currentReplyHeight = 0;
 let hasAsked = false;
+let audioKeepAlive = null;
+const AUDIO_WAKE_DELAY_MS = 1000;
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -175,7 +177,36 @@ async function announceBrain() {
   );
 }
 
+async function keepAudioAwake() {
+  const ctx = new AudioContext();
+  const source = ctx.createConstantSource();
+  const gain = ctx.createGain();
+
+  gain.gain.value = 0.0001;
+  source.connect(gain).connect(ctx.destination);
+  source.start();
+  await ctx.resume();
+
+  audioKeepAlive = ctx;
+
+  await new Promise((resolve) => setTimeout(resolve, AUDIO_WAKE_DELAY_MS));
+}
+
+function primeSpeech() {
+  return new Promise((resolve) => {
+    const utterance = new SpeechSynthesisUtterance("Hello");
+    utterance.volume = 0;
+    utterance.onend = resolve;
+    utterance.onerror = resolve;
+    window.speechSynthesis.speak(utterance);
+
+    setTimeout(resolve, 3000);
+  });
+}
+
 async function start() {
+  await keepAudioAwake();
+  await primeSpeech();
   const name = await window.herbie.getUserName();
   const message = `${getGreeting()}, ${name}. Herbie is online.`;
   document.querySelector("h1").textContent = message;

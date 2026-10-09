@@ -49,6 +49,21 @@
 
 ## Current status
 
-- Done: repo moved to the Windows drive; git initialized; Electron + TypeScript skeleton (src/main.ts, src/renderer/index.html); Node/Electron .gitignore.
-- Windows Ollama has llama3.2:latest (3B). Fine for now; may try a larger model at v0.4.
-- Next: check that Node.js is installed on Windows.
+- v0.1 DONE (tagged): full-screen Jarvis HUD at login, spoken greeting, glides and docks
+  to a 140px orb in the bottom-right, autostart via app.setLoginItemSettings
+  (`npm run autostart:off` removes it).
+- v0.2 DONE (tagged): click orb → floating chat bar; Enter sends the question to Ollama
+  via main (`herbie:ask`, input validated); reply panel above the bar grows the window
+  to fit (max 240px, scrolls); answers spoken aloud.
+  - Ollama: warm-up at startup with keep_alive 30m and num_ctx 16384 (both requests must
+    use the same num_ctx); health check via /api/version; spoken announcement when the
+    local brain is ready or failed.
+  - Memory: session-only history in main, last 60 messages; user name lives in main
+    (USER_NAME) and the greeting fetches it via `herbie:get-user-name`.
+  - Audio: silent AudioContext keeps the output awake; a muted priming utterance warms up
+    speechSynthesis; AUDIO_WAKE_DELAY_MS = 1000 before the greeting.
+- Model: llama3.2 3B, 100% GPU, ~4.1GB VRAM at 16K context.
+- Known TODOs: autostart re-enables itself every launch (make it a setting); ORB/BAR sizes
+  duplicated between main.ts and styles.css; history trimmed by message count, not tokens;
+  memory doesn't survive restarts.
+- Next: v0.3, media controls (play/pause/next) for YouTube/Netflix in the browser.
