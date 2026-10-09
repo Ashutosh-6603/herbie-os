@@ -12,9 +12,10 @@ const MAX_REPLY_HEIGHT = 240;
 const OLLAMA_BASE_URL = "http://localhost:11434";
 const OLLAMA_MODEL = "llama3.2";
 const OLLAMA_KEEP_ALIVE = "30m";
+const OLLAMA_CONTEXT = 16384;
 const MAX_PROMPT_LENGTH = 2000;
 const USER_NAME = "Ashutosh";
-const MAX_HISTORY_MESSAGES = 20;
+const MAX_HISTORY_MESSAGES = 60;
 const SYSTEM_PROMPT =
   `You are Herbie, a helpful desktop assistant for ${USER_NAME}. ` +
   "Keep answers short, one to three sentences, because they are spoken aloud. " +
@@ -72,6 +73,7 @@ async function warmUpOllama(): Promise<boolean> {
         model: OLLAMA_MODEL,
         messages: [],
         keep_alive: OLLAMA_KEEP_ALIVE,
+        options: { num_ctx: OLLAMA_CONTEXT },
       }),
       signal: AbortSignal.timeout(120_000),
     });
@@ -97,6 +99,7 @@ async function askOllama(messages: ChatMessage[]): Promise<string> {
       model: OLLAMA_MODEL,
       stream: false,
       keep_alive: OLLAMA_KEEP_ALIVE,
+      options: { num_ctx: OLLAMA_CONTEXT },
       messages,
     }),
     signal: AbortSignal.timeout(30_000),

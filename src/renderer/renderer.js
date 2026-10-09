@@ -9,10 +9,14 @@ function getGreeting() {
 }
 
 function speak(text, onDone) {
-  window.speechSynthesis.cancel();
+  const synth = window.speechSynthesis;
+  if (synth.speaking || synth.pending) {
+    synth.cancel();
+  }
+
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.onend = onDone;
-  window.speechSynthesis.speak(utterance);
+  synth.speak(utterance);
 }
 
 function waitForTransform(el) {
