@@ -1,7 +1,16 @@
 let currentReplyHeight = 0;
 let hasAsked = false;
+let isBusy = false; // NEW: true while Herbie is transcribing or thinking
 let audioKeepAlive = null;
 const AUDIO_WAKE_DELAY_MS = 1000;
+
+const voiceContext = new AudioContext({ sampleRate: 16000 });
+const MIN_RECORDING_SECONDS = 0.3;
+
+let micStream = null;
+let recorder = null;
+let chunks = [];
+let recordingStarted = null;
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -85,16 +94,24 @@ function clearReply() {
   currentReplyHeight = 0;
 }
 
+// CHANGED: returns a Promise that resolves once the bar is visible
 function openBar() {
-  window.addEventListener(
-    "resize",
-    () => {
-      document.body.classList.add("bar-open");
-      document.querySelector(".bar-input").focus();
-    },
-    { once: true },
-  );
-  window.herbie.openBar();
+  if (document.body.classList.contains("bar-open")) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    window.addEventListener(
+      "resize",
+      () => {
+        document.body.classList.add("bar-open");
+        document.querySelector(".bar-input").focus();
+        resolve();
+      },
+      { once: true },
+    );
+    window.herbie.openBar();
+  });
 }
 
 function closeBar() {
@@ -103,26 +120,32 @@ function closeBar() {
   window.herbie.closeBar();
 }
 
+// CHANGED: added the speech-to-text failure case
 function getErrorMessage(err) {
   const message = String(err?.message ?? "");
   if (message.includes("OLLAMA_DOWN")) {
-    return "I am having some error connecting to Ollama. Please check that it is running.";
+    return "My local brain isn't running. Please start Ollama.";
+  }
+  if (message.includes("STT_DOWN")) {
+    return "My speech recognition isn't ready. The first launch needs internet to download it.";
   }
   if (message.toLowerCase().includes("timeout")) {
-    return "It is taking too long to respond. Try again in a moment.";
+    return "My local brain is taking too long to respond. Try again in a moment.";
   }
   return "Sorry, something went wrong while thinking about that.";
 }
 
-async function handleAsk(input) {
-  const prompt = input.value.trim();
-  if (!prompt || input.disabled) return;
-
+// CHANGED: was handleAsk(input); now takes the question text, used by typing and voice
+async function askHerbie(prompt) {
+  if (isBusy) return;
+  isBusy = true;
   hasAsked = true;
+
+  const input = document.querySelector(".bar-input");
   input.value = "";
   input.disabled = true;
   input.placeholder = "Thinking...";
-  showReply("Thinking...");
+  showReply(`"${prompt}"\nThinking...`);
 
   try {
     const reply = await window.herbie.ask(prompt);
@@ -134,10 +157,69 @@ async function handleAsk(input) {
     showReply(message);
     speak(message);
   } finally {
+    isBusy = false;
     input.disabled = false;
     input.placeholder = "Ask Herbie...";
     input.focus();
   }
+}
+
+async function startRecording() {
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+  });
+  chunks = [];
+  recorder = new MediaRecorder(micStream);
+  recorder.ondataavailable = (e) => chunks.push(e.data);
+  recorder.start();
+}
+
+function stopRecording() {
+  return new Promise((resolve, reject) => {
+    recorder.onstop = async () => {
+      micStream.getTracks().forEach((track) => track.stop());
+      try {
+        const blob = new Blob(chunks, { type: recorder.mimeType });
+        const audio = await voiceContext.decodeAudioData(
+          await blob.arrayBuffer(),
+        );
+        resolve(audio.getChannelData(0));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    recorder.stop();
+  });
+}
+
+// NEW: transcribe a recording and ask Herbie about it
+async function handleVoice(samples) {
+  if (!document.body.classList.contains("orb-mode") || isBusy) return;
+
+  isBusy = true;
+  let text = "";
+
+  try {
+    await openBar();
+    showReply("Transcribing...");
+    text = await window.herbie.transcribe(samples);
+  } catch (err) {
+    console.error(err);
+    const message = getErrorMessage(err);
+    showReply(message);
+    speak(message);
+    return;
+  } finally {
+    isBusy = false;
+  }
+
+  if (!text) {
+    showReply("I didn't catch that.");
+    speak("I didn't catch that.");
+    return;
+  }
+
+  askHerbie(text);
 }
 
 document.querySelector(".reactor").addEventListener("click", () => {
@@ -150,10 +232,11 @@ document.querySelector(".reactor").addEventListener("click", () => {
   }
 });
 
+// CHANGED: typed questions go through askHerbie
 document.querySelector(".bar-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    handleAsk(e.target);
-  }
+  if (e.key !== "Enter") return;
+  const prompt = e.target.value.trim();
+  if (prompt) askHerbie(prompt);
 });
 
 document.addEventListener("keydown", (e) => {
@@ -166,13 +249,37 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// CHANGED: record while held, then transcribe and ask (playback test removed)
+window.herbie.onPushToTalk(async (state) => {
+  document.body.classList.toggle("listening", state === "down");
+
+  if (state === "down") {
+    window.speechSynthesis.cancel(); // NEW: talking interrupts Herbie
+    recordingStarted = startRecording();
+    return;
+  }
+
+  let samples;
+  try {
+    await recordingStarted;
+    samples = await stopRecording();
+  } catch (err) {
+    console.error(err);
+    speak("I couldn't access the microphone.");
+    return;
+  }
+
+  if (samples.length / 16000 < MIN_RECORDING_SECONDS) return;
+  handleVoice(samples);
+});
+
 async function announceBrain() {
   const ready = await window.herbie.waitForBrain();
   if (hasAsked) return;
 
   speak(
     ready
-      ? "What do you have in mind? You can ask me anything."
+      ? "My local brain is online. Ask me anything."
       : "I couldn't start my local brain. Please check that Ollama is running.",
   );
 }
@@ -203,73 +310,6 @@ function primeSpeech() {
     setTimeout(resolve, 3000);
   });
 }
-
-// NEW: audio context at 16 kHz, the sample rate Whisper expects
-const voiceContext = new AudioContext({ sampleRate: 16000 });
-const MIN_RECORDING_SECONDS = 0.3;
-
-let micStream = null;
-let recorder = null;
-let chunks = [];
-let recordingStarted = null;
-
-// NEW: open the mic and start recording
-async function startRecording() {
-  micStream = await navigator.mediaDevices.getUserMedia({
-    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-  });
-  chunks = [];
-  recorder = new MediaRecorder(micStream);
-  recorder.ondataavailable = (e) => chunks.push(e.data);
-  recorder.start();
-}
-
-// NEW: stop recording, release the mic, return raw 16 kHz samples
-function stopRecording() {
-  return new Promise((resolve, reject) => {
-    recorder.onstop = async () => {
-      micStream.getTracks().forEach((track) => track.stop());
-      try {
-        const blob = new Blob(chunks, { type: recorder.mimeType });
-        const audio = await voiceContext.decodeAudioData(
-          await blob.arrayBuffer(),
-        );
-        resolve(audio.getChannelData(0));
-      } catch (err) {
-        reject(err);
-      }
-    };
-    recorder.stop();
-  });
-}
-
-function playBack(samples) {
-  const buffer = voiceContext.createBuffer(1, samples.length, 16000);
-  buffer.copyToChannel(samples, 0);
-  const source = voiceContext.createBufferSource();
-  source.buffer = buffer;
-  source.connect(voiceContext.destination);
-  source.start();
-}
-
-window.herbie.onPushToTalk(async (state) => {
-  document.body.classList.toggle("listening", state === "down");
-
-  if (state === "down") {
-    recordingStarted = startRecording();
-    return;
-  }
-
-  try {
-    await recordingStarted;
-    const samples = await stopRecording();
-    if (samples.length / 16000 < MIN_RECORDING_SECONDS) return;
-    playBack(samples);
-  } catch (err) {
-    console.error(err);
-    speak("I couldn't access the microphone.");
-  }
-});
 
 async function start() {
   await keepAudioAwake();

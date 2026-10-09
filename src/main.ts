@@ -18,6 +18,12 @@ const MAX_PROMPT_LENGTH = 2000;
 const USER_NAME = "Ashutosh";
 const MAX_HISTORY_MESSAGES = 60;
 const PUSH_TO_TALK_KEY = UiohookKey.CtrlRight;
+const STT_MODEL = "Xenova/whisper-base.en";
+const MAX_RECORDING_SAMPLES = 16000 * 30;
+
+type Transcriber = (
+  audio: Float32Array,
+) => Promise<{ text: string } | { text: string }[]>;
 
 const SYSTEM_PROMPT =
   `You are Herbie, a helpful desktop assistant for ${USER_NAME}. ` +
@@ -91,6 +97,23 @@ async function warmUpOllama(): Promise<boolean> {
   } catch (err) {
     console.error("Ollama warm-up failed:", err);
     return false;
+  }
+}
+
+async function loadTranscriber(): Promise<Transcriber | null> {
+  try {
+    const { pipeline, env } = await import("@huggingface/transformers");
+    env.cacheDir = path.join(app.getPath("userData"), "models");
+
+    const transcriber = await pipeline(
+      "automatic-speech-recognition",
+      STT_MODEL,
+    );
+    console.log("Speech-to-text ready");
+    return transcriber as unknown as Transcriber;
+  } catch (err) {
+    console.error("Speech-to-text failed to load:", err);
+    return null;
   }
 }
 
@@ -179,9 +202,37 @@ app.whenReady().then(() => {
 
   const brainReady = warmUpOllama();
 
+  const transcriberReady = loadTranscriber();
+
   ipcMain.handle("herbie:wait-for-brain", () => brainReady);
 
   ipcMain.handle("herbie:get-user-name", () => USER_NAME);
+
+  ipcMain.handle("herbie:transcribe", async (_event, samples: unknown) => {
+    if (
+      !(samples instanceof Float32Array) ||
+      samples.length === 0 ||
+      samples.length > MAX_RECORDING_SAMPLES
+    ) {
+      throw new Error("Invalid audio");
+    }
+
+    const transcriber = await transcriberReady;
+    if (!transcriber) {
+      throw new Error("STT_DOWN");
+    }
+
+    const result = await transcriber(samples);
+    const raw = Array.isArray(result) ? result[0]?.text : result.text;
+    let text = (raw ?? "").trim();
+
+    if (/^[\[(].*[\])]$/.test(text)) {
+      text = "";
+    }
+
+    console.log(`Heard: ${text}`);
+    return text;
+  });
 
   let pushToTalkHeld = false;
 

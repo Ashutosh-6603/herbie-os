@@ -14,4 +14,6 @@ contextBridge.exposeInMainWorld("herbie", {
   onPushToTalk: (callback: (state: "down" | "up") => void) => {
     ipcRenderer.on("herbie:push-to-talk", (_event, state) => callback(state));
   },
+  transcribe: (samples: Float32Array) =>
+    ipcRenderer.invoke("herbie:transcribe", samples),
 });
