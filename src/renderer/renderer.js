@@ -204,9 +204,71 @@ function primeSpeech() {
   });
 }
 
-window.herbie.onPushToTalk((state) => {
+// NEW: audio context at 16 kHz, the sample rate Whisper expects
+const voiceContext = new AudioContext({ sampleRate: 16000 });
+const MIN_RECORDING_SECONDS = 0.3;
+
+let micStream = null;
+let recorder = null;
+let chunks = [];
+let recordingStarted = null;
+
+// NEW: open the mic and start recording
+async function startRecording() {
+  micStream = await navigator.mediaDevices.getUserMedia({
+    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+  });
+  chunks = [];
+  recorder = new MediaRecorder(micStream);
+  recorder.ondataavailable = (e) => chunks.push(e.data);
+  recorder.start();
+}
+
+// NEW: stop recording, release the mic, return raw 16 kHz samples
+function stopRecording() {
+  return new Promise((resolve, reject) => {
+    recorder.onstop = async () => {
+      micStream.getTracks().forEach((track) => track.stop());
+      try {
+        const blob = new Blob(chunks, { type: recorder.mimeType });
+        const audio = await voiceContext.decodeAudioData(
+          await blob.arrayBuffer(),
+        );
+        resolve(audio.getChannelData(0));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    recorder.stop();
+  });
+}
+
+function playBack(samples) {
+  const buffer = voiceContext.createBuffer(1, samples.length, 16000);
+  buffer.copyToChannel(samples, 0);
+  const source = voiceContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(voiceContext.destination);
+  source.start();
+}
+
+window.herbie.onPushToTalk(async (state) => {
   document.body.classList.toggle("listening", state === "down");
-  console.log(`Push-to-talk: ${state}`);
+
+  if (state === "down") {
+    recordingStarted = startRecording();
+    return;
+  }
+
+  try {
+    await recordingStarted;
+    const samples = await stopRecording();
+    if (samples.length / 16000 < MIN_RECORDING_SECONDS) return;
+    playBack(samples);
+  } catch (err) {
+    console.error(err);
+    speak("I couldn't access the microphone.");
+  }
 });
 
 async function start() {

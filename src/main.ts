@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from "electron";
+import { app, BrowserWindow, ipcMain, screen, session } from "electron";
 import * as path from "node:path";
 import { uIOhook, UiohookKey } from "uiohook-napi";
 
@@ -161,6 +161,19 @@ app.whenReady().then(() => {
   }
 
   setAutostart(true);
+
+  session.defaultSession.setPermissionRequestHandler(
+    (_webContents, permission, callback, details) => {
+      const mediaTypes =
+        "mediaTypes" in details ? (details.mediaTypes ?? []) : [];
+      const audioOnly =
+        permission === "media" &&
+        mediaTypes.length > 0 &&
+        mediaTypes.every((type) => type === "audio");
+
+      callback(audioOnly);
+    },
+  );
 
   const win = createWindow();
 
