@@ -1,6 +1,6 @@
 let currentReplyHeight = 0;
 let hasAsked = false;
-let isBusy = false; // NEW: true while Herbie is transcribing or thinking
+let isBusy = false;
 let audioKeepAlive = null;
 const AUDIO_WAKE_DELAY_MS = 1000;
 
@@ -94,7 +94,6 @@ function clearReply() {
   currentReplyHeight = 0;
 }
 
-// CHANGED: returns a Promise that resolves once the bar is visible
 function openBar() {
   if (document.body.classList.contains("bar-open")) {
     return Promise.resolve();
@@ -120,7 +119,6 @@ function closeBar() {
   window.herbie.closeBar();
 }
 
-// CHANGED: added the speech-to-text failure case
 function getErrorMessage(err) {
   const message = String(err?.message ?? "");
   if (message.includes("OLLAMA_DOWN")) {
@@ -135,7 +133,6 @@ function getErrorMessage(err) {
   return "Sorry, something went wrong while thinking about that.";
 }
 
-// CHANGED: was handleAsk(input); now takes the question text, used by typing and voice
 async function askHerbie(prompt) {
   if (isBusy) return;
   isBusy = true;
@@ -148,9 +145,9 @@ async function askHerbie(prompt) {
   showReply(`"${prompt}"\nThinking...`);
 
   try {
-    const reply = await window.herbie.ask(prompt);
-    showReply(reply);
-    speak(reply);
+    const { text, silent } = await window.herbie.ask(prompt); // CHANGED
+    showReply(text);
+    if (!silent) speak(text);
   } catch (err) {
     console.error(err);
     const message = getErrorMessage(err);
@@ -192,7 +189,6 @@ function stopRecording() {
   });
 }
 
-// NEW: transcribe a recording and ask Herbie about it
 async function handleVoice(samples) {
   if (!document.body.classList.contains("orb-mode") || isBusy) return;
 
@@ -232,7 +228,6 @@ document.querySelector(".reactor").addEventListener("click", () => {
   }
 });
 
-// CHANGED: typed questions go through askHerbie
 document.querySelector(".bar-input").addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
   const prompt = e.target.value.trim();
@@ -249,7 +244,6 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// CHANGED: record while held, then transcribe and ask (playback test removed)
 window.herbie.onPushToTalk(async (state) => {
   document.body.classList.toggle("listening", state === "down");
 

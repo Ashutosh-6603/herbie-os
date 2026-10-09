@@ -1,6 +1,11 @@
 import { app, BrowserWindow, ipcMain, screen, session } from "electron";
 import * as path from "node:path";
 import { uIOhook, UiohookKey } from "uiohook-napi";
+import {
+  matchMediaCommand,
+  performMediaAction,
+  MEDIA_REPLIES,
+} from "./media.js";
 
 const ORB_SIZE = 140;
 const ORB_MARGIN = 24;
@@ -300,6 +305,13 @@ app.whenReady().then(() => {
       throw new Error("Invalid prompt");
     }
 
+    const mediaAction = matchMediaCommand(prompt);
+    if (mediaAction) {
+      console.log(`Command: ${mediaAction}`);
+      await performMediaAction(mediaAction);
+      return { text: MEDIA_REPLIES[mediaAction], silent: true };
+    }
+
     if (!(await isOllamaUp())) {
       throw new Error("OLLAMA_DOWN");
     }
@@ -318,7 +330,7 @@ app.whenReady().then(() => {
 
     console.log(`You: ${question.content}`);
     console.log(`Herbie: ${reply}`);
-    return reply;
+    return { text: reply, silent: false }; // CHANGED: returns an object now
   });
 });
 
