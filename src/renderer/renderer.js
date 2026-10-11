@@ -1,6 +1,7 @@
 let currentReplyHeight = 0;
 let hasAsked = false;
 let isBusy = false;
+let currentPrompt = "";
 let audioKeepAlive = null;
 const AUDIO_WAKE_DELAY_MS = 1000;
 
@@ -124,12 +125,27 @@ function getErrorMessage(err) {
   if (message.includes("OLLAMA_DOWN")) {
     return "My local brain isn't running. Please start Ollama.";
   }
+
   if (message.includes("STT_DOWN")) {
     return "My speech recognition isn't ready. The first launch needs internet to download it.";
   }
+
+  if (message.includes("CLAUDE_MISSING")) {
+    return "I can't search the web because Claude Code isn't installed.";
+  }
+
+  if (message.includes("CLAUDE_TIMEOUT")) {
+    return "The web search took too long. Try again in a moment.";
+  }
+
+  if (message.includes("CLAUDE_FAILED")) {
+    return "The web search failed. Check that you're signed in to Claude Code.";
+  }
+
   if (message.toLowerCase().includes("timeout")) {
     return "My local brain is taking too long to respond. Try again in a moment.";
   }
+
   return "Sorry, something went wrong while thinking about that.";
 }
 
@@ -137,6 +153,7 @@ async function askHerbie(prompt) {
   if (isBusy) return;
   isBusy = true;
   hasAsked = true;
+  currentPrompt = prompt;
 
   const input = document.querySelector(".bar-input");
   input.value = "";
@@ -145,9 +162,9 @@ async function askHerbie(prompt) {
   showReply(`"${prompt}"\nThinking...`);
 
   try {
-    const { text, silent } = await window.herbie.ask(prompt); // CHANGED
+    const { text, speech, silent } = await window.herbie.ask(prompt);
     showReply(text);
-    if (!silent) speak(text);
+    if (!silent) speak(speech ?? text);
   } catch (err) {
     console.error(err);
     const message = getErrorMessage(err);
@@ -241,6 +258,13 @@ document.addEventListener("keydown", (e) => {
     closeBar();
   } else {
     window.herbie.quit();
+  }
+});
+
+window.herbie.onStatus((status) => {
+  if (status === "searching") {
+    showReply(`"${currentPrompt}"\nSearching the web...`);
+    speak("Let me look that up.");
   }
 });
 

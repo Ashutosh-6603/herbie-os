@@ -55,15 +55,23 @@
 - v0.2 DONE (tagged): click orb → floating chat bar; Enter sends the question to Ollama
   via main (`herbie:ask`, input validated); reply panel above the bar grows the window
   to fit (max 240px, scrolls); answers spoken aloud.
-  - Ollama: warm-up at startup with keep_alive 30m and num_ctx 16384 (both requests must
-    use the same num_ctx); health check via /api/version; spoken announcement when the
-    local brain is ready or failed.
-  - Memory: session-only history in main, last 60 messages; user name lives in main
-    (USER_NAME) and the greeting fetches it via `herbie:get-user-name`.
-  - Audio: silent AudioContext keeps the output awake; a muted priming utterance warms up
-    speechSynthesis; AUDIO_WAKE_DELAY_MS = 1000 before the greeting.
+- Ollama: warm-up at startup with keep_alive 30m and num_ctx 16384 (both requests must
+  use the same num_ctx); health check via /api/version; spoken announcement when the
+  local brain is ready or failed.
+- Memory: session-only history in main, last 60 messages; user name lives in main
+  (USER_NAME) and the greeting fetches it via `herbie:get-user-name`.
+- Audio: silent AudioContext keeps the output awake; a muted priming utterance warms up
+  speechSynthesis; AUDIO_WAKE_DELAY_MS = 1000 before the greeting.
 - Model: llama3.2 3B, 100% GPU, ~4.1GB VRAM at 16K context.
 - Known TODOs: autostart re-enables itself every launch (make it a setting); ORB/BAR sizes
   duplicated between main.ts and styles.css; history trimmed by message count, not tokens;
   memory doesn't survive restarts.
-- Next: v0.3, media controls (play/pause/next) for YouTube/Netflix in the browser.
+- Voice (originally v0.4) DONE: hold Right Ctrl to talk (uiohook-napi global hook, only
+  checks that one key); mic open only while held; audio → 16 kHz Float32Array →
+  `herbie:transcribe` → Whisper (Transformers.js, Xenova/whisper-base.en, cached in
+  userData/models) → same ask pipeline as typing. Permission handler allows audio only.
+- v0.3 DONE (tagged): media commands matched exactly in src/media.ts (Map lookup after
+  normalizing), run via PowerShell SendKeys media key codes with execFile; never
+  interpolate user text into commands. Silent replies ({ text, silent }).
+  Known limits: play/pause is a toggle; Netflix ignores next/previous.
+- Next: v0.5, Claude API for web questions, with routing between local and Claude.

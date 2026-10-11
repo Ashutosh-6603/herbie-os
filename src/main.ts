@@ -6,6 +6,8 @@ import {
   performMediaAction,
   MEDIA_REPLIES,
 } from "./media.js";
+import { mkdirSync } from "node:fs";
+import { askClaude, needsClaude, stripTrigger } from "./claude.js";
 
 const ORB_SIZE = 140;
 const ORB_MARGIN = 24;
@@ -41,6 +43,23 @@ type ChatMessage = {
 };
 
 const history: ChatMessage[] = [];
+
+function rememberExchange(question: string, answer: string): void {
+  history.push(
+    { role: "user", content: question },
+    { role: "assistant", content: answer },
+  );
+  if (history.length > MAX_HISTORY_MESSAGES) {
+    history.splice(0, history.length - MAX_HISTORY_MESSAGES);
+  }
+}
+
+function recentContext(): string {
+  return history
+    .slice(-6)
+    .map((m) => `${m.role === "user" ? "User" : "Herbie"}: ${m.content}`)
+    .join("\n");
+}
 
 function getOrbBounds() {
   const { x, y, width, height } = screen.getPrimaryDisplay().workArea;
@@ -209,6 +228,12 @@ app.whenReady().then(() => {
 
   const transcriberReady = loadTranscriber();
 
+  const claudeWorkspace = path.join(
+    app.getPath("userData"),
+    "claude-workspace",
+  );
+  mkdirSync(claudeWorkspace, { recursive: true });
+
   ipcMain.handle("herbie:wait-for-brain", () => brainReady);
 
   ipcMain.handle("herbie:get-user-name", () => USER_NAME);
@@ -305,32 +330,47 @@ app.whenReady().then(() => {
       throw new Error("Invalid prompt");
     }
 
-    const mediaAction = matchMediaCommand(prompt);
+    const question = prompt.trim();
+
+    const mediaAction = matchMediaCommand(question);
     if (mediaAction) {
       console.log(`Command: ${mediaAction}`);
       await performMediaAction(mediaAction);
       return { text: MEDIA_REPLIES[mediaAction], silent: true };
     }
 
+    if (needsClaude(question)) {
+      win.webContents.send("herbie:status", "searching");
+
+      const context = recentContext();
+      const cleaned = stripTrigger(question);
+      const input = context
+        ? `Conversation so far:\n${context}\n\nNew question: ${cleaned}`
+        : cleaned;
+
+      console.log(`You (web): ${question}`);
+      const answer = await askClaude(input, claudeWorkspace);
+      console.log(`Claude: ${answer.speech}`);
+
+      rememberExchange(question, answer.speech);
+      return { text: answer.display, speech: answer.speech, silent: false };
+    }
+
     if (!(await isOllamaUp())) {
       throw new Error("OLLAMA_DOWN");
     }
 
-    const question: ChatMessage = { role: "user", content: prompt.trim() };
     const reply = await askOllama([
       { role: "system", content: SYSTEM_PROMPT },
       ...history,
-      question,
+      { role: "user", content: question },
     ]);
 
-    history.push(question, { role: "assistant", content: reply });
-    if (history.length > MAX_HISTORY_MESSAGES) {
-      history.splice(0, history.length - MAX_HISTORY_MESSAGES);
-    }
+    rememberExchange(question, reply); // CHANGED: uses the shared helper
 
-    console.log(`You: ${question.content}`);
+    console.log(`You: ${question}`);
     console.log(`Herbie: ${reply}`);
-    return { text: reply, silent: false }; // CHANGED: returns an object now
+    return { text: reply, silent: false };
   });
 });
 

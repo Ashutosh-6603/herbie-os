@@ -16,4 +16,7 @@ contextBridge.exposeInMainWorld("herbie", {
   },
   transcribe: (samples: Float32Array) =>
     ipcRenderer.invoke("herbie:transcribe", samples),
+  onStatus: (callback: (status: string) => void) => {
+    ipcRenderer.on("herbie:status", (_event, status) => callback(status));
+  },
 });
