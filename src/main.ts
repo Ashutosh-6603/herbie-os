@@ -1,12 +1,19 @@
-import { app, BrowserWindow, ipcMain, screen, session } from "electron";
+import {
+  app,
+  BrowserWindow,
+  globalShortcut,
+  ipcMain,
+  screen,
+  session,
+} from "electron";
 import * as path from "node:path";
+import { mkdirSync } from "node:fs";
 import { uIOhook, UiohookKey } from "uiohook-napi";
 import {
   matchMediaCommand,
   performMediaAction,
   MEDIA_REPLIES,
 } from "./media.js";
-import { mkdirSync } from "node:fs";
 import { askClaude, needsClaude, stripTrigger } from "./claude.js";
 
 const ORB_SIZE = 140;
@@ -22,24 +29,29 @@ const OLLAMA_MODEL = "llama3.2";
 const OLLAMA_KEEP_ALIVE = "30m";
 const OLLAMA_CONTEXT = 16384;
 const MAX_PROMPT_LENGTH = 2000;
+
 const USER_NAME = "Ashutosh";
 const MAX_HISTORY_MESSAGES = 60;
-const PUSH_TO_TALK_KEY = UiohookKey.CtrlRight;
-const STT_MODEL = "Xenova/whisper-base.en";
-const MAX_RECORDING_SAMPLES = 16000 * 30;
-
-type Transcriber = (
-  audio: Float32Array,
-) => Promise<{ text: string } | { text: string }[]>;
-
 const SYSTEM_PROMPT =
   `You are Herbie, a helpful desktop assistant for ${USER_NAME}. ` +
   "Keep answers short, one to three sentences, because they are spoken aloud. " +
   "Don't end your answers with follow-up questions unless you need more information.";
 
+const PUSH_TO_TALK_KEY = UiohookKey.CtrlRight;
+const SLEEP_SHORTCUT = "CommandOrControl+Alt+H";
+
+const STT_MODEL = "Xenova/whisper-base.en";
+const MAX_RECORDING_SAMPLES = 16000 * 30;
+
 type ChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
+};
+
+type Transcriber = ((
+  audio: Float32Array,
+) => Promise<{ text: string } | { text: string }[]>) & {
+  dispose?: () => Promise<void>;
 };
 
 const history: ChatMessage[] = [];
@@ -121,6 +133,24 @@ async function warmUpOllama(): Promise<boolean> {
   } catch (err) {
     console.error("Ollama warm-up failed:", err);
     return false;
+  }
+}
+
+async function unloadOllama(): Promise<void> {
+  try {
+    await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        messages: [],
+        keep_alive: 0,
+      }),
+      signal: AbortSignal.timeout(5_000),
+    });
+    console.log("Ollama model unloaded");
+  } catch (err) {
+    console.error("Ollama unload failed:", err);
   }
 }
 
@@ -224,65 +254,15 @@ app.whenReady().then(() => {
 
   const win = createWindow();
 
-  const brainReady = warmUpOllama();
-
-  const transcriberReady = loadTranscriber();
+  let brainReady = warmUpOllama();
+  let transcriberReady = loadTranscriber();
+  let asleep = false;
 
   const claudeWorkspace = path.join(
     app.getPath("userData"),
     "claude-workspace",
   );
   mkdirSync(claudeWorkspace, { recursive: true });
-
-  ipcMain.handle("herbie:wait-for-brain", () => brainReady);
-
-  ipcMain.handle("herbie:get-user-name", () => USER_NAME);
-
-  ipcMain.handle("herbie:transcribe", async (_event, samples: unknown) => {
-    if (
-      !(samples instanceof Float32Array) ||
-      samples.length === 0 ||
-      samples.length > MAX_RECORDING_SAMPLES
-    ) {
-      throw new Error("Invalid audio");
-    }
-
-    const transcriber = await transcriberReady;
-    if (!transcriber) {
-      throw new Error("STT_DOWN");
-    }
-
-    const result = await transcriber(samples);
-    const raw = Array.isArray(result) ? result[0]?.text : result.text;
-    let text = (raw ?? "").trim();
-
-    if (/^[\[(].*[\])]$/.test(text)) {
-      text = "";
-    }
-
-    console.log(`Heard: ${text}`);
-    return text;
-  });
-
-  let pushToTalkHeld = false;
-
-  uIOhook.on("keydown", (e) => {
-    if (e.keycode !== PUSH_TO_TALK_KEY || pushToTalkHeld) return;
-    pushToTalkHeld = true;
-    win.webContents.send("herbie:push-to-talk", "down");
-  });
-
-  uIOhook.on("keyup", (e) => {
-    if (e.keycode !== PUSH_TO_TALK_KEY || !pushToTalkHeld) return;
-    pushToTalkHeld = false;
-    win.webContents.send("herbie:push-to-talk", "up");
-  });
-
-  uIOhook.start();
-
-  app.on("will-quit", () => {
-    uIOhook.stop();
-  });
 
   ipcMain.on("herbie:shrink", () => {
     win.setAlwaysOnTop(true, "floating");
@@ -317,7 +297,8 @@ app.whenReady().then(() => {
     win.setBounds(getBarBounds(safeHeight));
   });
 
-  ipcMain.on("herbie:quit", () => {
+  ipcMain.on("herbie:quit", async () => {
+    await unloadOllama();
     app.quit();
   });
 
@@ -366,11 +347,100 @@ app.whenReady().then(() => {
       { role: "user", content: question },
     ]);
 
-    rememberExchange(question, reply); // CHANGED: uses the shared helper
+    rememberExchange(question, reply);
 
     console.log(`You: ${question}`);
     console.log(`Herbie: ${reply}`);
     return { text: reply, silent: false };
+  });
+
+  ipcMain.handle("herbie:wait-for-brain", () => brainReady);
+
+  ipcMain.handle("herbie:get-user-name", () => USER_NAME);
+
+  ipcMain.handle("herbie:transcribe", async (_event, samples: unknown) => {
+    if (
+      !(samples instanceof Float32Array) ||
+      samples.length === 0 ||
+      samples.length > MAX_RECORDING_SAMPLES
+    ) {
+      throw new Error("Invalid audio");
+    }
+
+    const transcriber = await transcriberReady;
+    if (!transcriber) {
+      throw new Error("STT_DOWN");
+    }
+
+    const result = await transcriber(samples);
+    const raw = Array.isArray(result) ? result[0]?.text : result.text;
+    let text = (raw ?? "").trim();
+
+    if (/^[\[(].*[\])]$/.test(text)) {
+      text = "";
+    }
+
+    console.log(`Heard: ${text}`);
+    return text;
+  });
+
+  let pushToTalkHeld = false;
+
+  uIOhook.on("keydown", (e) => {
+    if (asleep) return;
+    if (e.keycode !== PUSH_TO_TALK_KEY || pushToTalkHeld) return;
+    pushToTalkHeld = true;
+    win.webContents.send("herbie:push-to-talk", "down");
+  });
+
+  uIOhook.on("keyup", (e) => {
+    if (e.keycode !== PUSH_TO_TALK_KEY || !pushToTalkHeld) return;
+    pushToTalkHeld = false;
+    win.webContents.send("herbie:push-to-talk", "up");
+  });
+
+  uIOhook.start();
+
+  async function goToSleep(): Promise<void> {
+    asleep = true;
+    pushToTalkHeld = false;
+    win.webContents.send("herbie:status", "sleeping");
+    win.hide();
+
+    const transcriber = await transcriberReady;
+    transcriberReady = Promise.resolve(null);
+    await transcriber?.dispose?.();
+
+    await unloadOllama();
+    console.log("Herbie is asleep");
+  }
+
+  function wakeUp(): void {
+    asleep = false;
+    brainReady = warmUpOllama();
+    transcriberReady = loadTranscriber();
+    win.showInactive();
+    win.webContents.send("herbie:status", "waking");
+    console.log("Herbie is awake");
+  }
+
+  const registered = globalShortcut.register(SLEEP_SHORTCUT, () => {
+    if (asleep) {
+      wakeUp();
+    } else {
+      goToSleep();
+    }
+  });
+
+  if (!registered) {
+    console.error(
+      `Could not register ${SLEEP_SHORTCUT}; another app may be using it`,
+    );
+  }
+
+  app.on("will-quit", () => {
+    uIOhook.stop();
+    globalShortcut.unregisterAll();
   });
 });
 

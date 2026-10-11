@@ -2,6 +2,7 @@ let currentReplyHeight = 0;
 let hasAsked = false;
 let isBusy = false;
 let currentPrompt = "";
+let asleep = false;
 let audioKeepAlive = null;
 const AUDIO_WAKE_DELAY_MS = 1000;
 
@@ -261,14 +262,49 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-window.herbie.onStatus((status) => {
+function cancelRecording() {
+  if (recorder && recorder.state === "recording") {
+    recorder.onstop = null;
+    recorder.stop();
+  }
+  micStream?.getTracks().forEach((track) => track.stop());
+  document.body.classList.remove("listening");
+}
+
+window.herbie.onStatus(async (status) => {
   if (status === "searching") {
     showReply(`"${currentPrompt}"\nSearching the web...`);
     speak("Let me look that up.");
+    return;
+  }
+
+  if (status === "sleeping") {
+    asleep = true;
+    window.speechSynthesis.cancel();
+    cancelRecording();
+    if (document.body.classList.contains("bar-open")) closeBar();
+    await audioKeepAlive?.suspend();
+    return;
+  }
+
+  if (status === "waking") {
+    asleep = false;
+    await audioKeepAlive?.resume();
+    await new Promise((resolve) => setTimeout(resolve, AUDIO_WAKE_DELAY_MS));
+    speak("I'm back.");
+
+    const ready = await window.herbie.waitForBrain();
+    speak(
+      ready
+        ? "My local brain is online."
+        : "I couldn't start my local brain. Please check that Ollama is running.",
+    );
   }
 });
 
 window.herbie.onPushToTalk(async (state) => {
+  if (asleep) return;
+
   document.body.classList.toggle("listening", state === "down");
 
   if (state === "down") {
