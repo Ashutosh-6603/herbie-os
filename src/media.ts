@@ -29,6 +29,7 @@ export const MEDIA_REPLIES: Record<MediaAction, string> = {
 const COMMANDS = new Map<string, MediaAction>([
   ["pause", "playPause"],
   ["play", "playPause"],
+  ["start", "playPause"],
   ["resume", "playPause"],
   ["stop", "playPause"],
   ["next", "next"],
@@ -49,15 +50,28 @@ const COMMANDS = new Map<string, MediaAction>([
 
 const FILLER_WORDS = /\b(herbie|please|the|video|music|song|track|this)\b/g;
 
-export function matchMediaCommand(text: string): MediaAction | null {
-  const normalized = text
+// export function matchMediaCommand(text: string): MediaAction | null {
+//   const normalized = text
+//     .toLowerCase()
+//     .replace(/[^a-z\s]/g, "")
+//     .replace(FILLER_WORDS, "")
+//     .replace(/\s+/g, " ")
+//     .trim();
+
+//   return COMMANDS.get(normalized) ?? null;
+// }
+
+export function normalizeCommand(text: string): string {
+  return text
     .toLowerCase()
     .replace(/[^a-z\s]/g, "")
     .replace(FILLER_WORDS, "")
     .replace(/\s+/g, " ")
     .trim();
+}
 
-  return COMMANDS.get(normalized) ?? null;
+export function matchMediaCommand(text: string): MediaAction | null {
+  return COMMANDS.get(normalizeCommand(text)) ?? null;
 }
 
 export function performMediaAction(action: MediaAction): Promise<void> {

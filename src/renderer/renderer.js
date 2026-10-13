@@ -271,6 +271,46 @@ function cancelRecording() {
   document.body.classList.remove("listening");
 }
 
+let cameraStream = null;
+const cameraVideo = document.createElement("video");
+cameraVideo.muted = true;
+cameraVideo.playsInline = true;
+
+async function startCamera() {
+  if (cameraStream) return;
+
+  cameraStream = await navigator.mediaDevices.getUserMedia({
+    video: { width: 640, height: 480, frameRate: { ideal: 30 } },
+    audio: false,
+  });
+  cameraVideo.srcObject = cameraStream;
+  await cameraVideo.play();
+  document.body.classList.add("camera-on");
+}
+
+function stopCamera() {
+  cameraStream?.getTracks().forEach((track) => track.stop());
+  cameraStream = null;
+  cameraVideo.srcObject = null;
+  document.body.classList.remove("camera-on");
+}
+
+window.herbie.onGestureMode(async (enabled) => {
+  if (enabled) {
+    try {
+      await startCamera();
+      speak("Gesture mode on.");
+    } catch (err) {
+      console.error(err);
+      speak("I couldn't access the camera.");
+    }
+    return;
+  }
+
+  stopCamera();
+  if (!asleep) speak("Gesture mode off.");
+});
+
 window.herbie.onStatus(async (status) => {
   if (status === "searching") {
     showReply(`"${currentPrompt}"\nSearching the web...`);

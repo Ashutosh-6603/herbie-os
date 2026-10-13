@@ -19,4 +19,9 @@ contextBridge.exposeInMainWorld("herbie", {
   onStatus: (callback: (status: string) => void) => {
     ipcRenderer.on("herbie:status", (_event, status) => callback(status));
   },
+  onGestureMode: (callback: (enabled: boolean) => void) => {
+    ipcRenderer.on("herbie:gesture-mode", (_event, enabled) =>
+      callback(enabled),
+    );
+  },
 });

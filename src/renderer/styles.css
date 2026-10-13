@@ -257,3 +257,12 @@ body.listening .core {
 body.listening .ring-outer {
   border-color: var(--cyan);
 }
+
+:root {
+  --amber: #ffb547;
+}
+
+body.camera-on .ring-inner {
+  border-color: var(--amber);
+  box-shadow: 0 0 12px var(--amber);
+}

@@ -11,6 +11,7 @@ import { mkdirSync } from "node:fs";
 import { uIOhook, UiohookKey } from "uiohook-napi";
 import {
   matchMediaCommand,
+  normalizeCommand,
   performMediaAction,
   MEDIA_REPLIES,
 } from "./media.js";
@@ -39,6 +40,20 @@ const SYSTEM_PROMPT =
 
 const PUSH_TO_TALK_KEY = UiohookKey.CtrlRight;
 const SLEEP_SHORTCUT = "CommandOrControl+Alt+H";
+
+const GESTURE_SHORTCUT = "CommandOrControl+Alt+G";
+
+const GESTURE_COMMANDS = new Map<string, "on" | "off" | "toggle">([
+  ["gesture mode", "toggle"],
+  ["gesture mode on", "on"],
+  ["gestures on", "on"],
+  ["start gestures", "on"],
+  ["enable gestures", "on"],
+  ["gesture mode off", "off"],
+  ["gestures off", "off"],
+  ["stop gestures", "off"],
+  ["disable gestures", "off"],
+]);
 
 const STT_MODEL = "Xenova/whisper-base.en";
 const MAX_RECORDING_SAMPLES = 16000 * 30;
@@ -240,20 +255,30 @@ app.whenReady().then(() => {
 
   setAutostart(true);
 
+  let gestureMode = false;
+
   session.defaultSession.setPermissionRequestHandler(
     (_webContents, permission, callback, details) => {
       const mediaTypes =
         "mediaTypes" in details ? (details.mediaTypes ?? []) : [];
-      const audioOnly =
+      const allowed =
         permission === "media" &&
         mediaTypes.length > 0 &&
-        mediaTypes.every((type) => type === "audio");
+        mediaTypes.every(
+          (type) => type === "audio" || (type === "video" && gestureMode),
+        );
 
-      callback(audioOnly);
+      callback(allowed);
     },
   );
 
   const win = createWindow();
+
+  function setGestureMode(enabled: boolean): void {
+    gestureMode = enabled;
+    win.webContents.send("herbie:gesture-mode", enabled);
+    console.log(`Gesture mode ${enabled ? "on" : "off"}`);
+  }
 
   let brainReady = warmUpOllama();
   let transcriberReady = loadTranscriber();
@@ -321,8 +346,22 @@ app.whenReady().then(() => {
       return { text: MEDIA_REPLIES[mediaAction], silent: true };
     }
 
+    const gestureCommand = GESTURE_COMMANDS.get(normalizeCommand(question));
+    if (gestureCommand) {
+      const enabled =
+        gestureCommand === "toggle" ? !gestureMode : gestureCommand === "on";
+      setGestureMode(enabled);
+      return {
+        text: enabled ? "Gesture mode on" : "Gesture mode off",
+        silent: true,
+      };
+    }
+
     if (needsClaude(question)) {
       win.webContents.send("herbie:status", "searching");
+
+      if (gestureMode) setGestureMode(false);
+      win.hide();
 
       const context = recentContext();
       const cleaned = stripTrigger(question);
@@ -436,6 +475,16 @@ app.whenReady().then(() => {
   if (!registered) {
     console.error(
       `Could not register ${SLEEP_SHORTCUT}; another app may be using it`,
+    );
+  }
+
+  const gestureRegistered = globalShortcut.register(GESTURE_SHORTCUT, () => {
+    if (!asleep) setGestureMode(!gestureMode);
+  });
+
+  if (!gestureRegistered) {
+    console.error(
+      `Could not register ${GESTURE_SHORTCUT}; another app may be using it`,
     );
   }
 
