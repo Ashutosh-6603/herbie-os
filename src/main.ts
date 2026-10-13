@@ -225,7 +225,8 @@ function createWindow(): BrowserWindow {
     win.show();
   });
 
-  win.loadFile(path.join(__dirname, "../src/renderer/index.html"));
+  // win.loadFile(path.join(__dirname, "../src/renderer/index.html"));
+  win.loadFile(path.join(__dirname, "renderer/index.html"));
 
   return win;
 }

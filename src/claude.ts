@@ -12,10 +12,10 @@ const TRIGGER = /^\s*(search(\s+for)?|look\s+up|lookup|google)\b[\s,:]*/i;
 
 const CLAUDE_INSTRUCTIONS =
   "You are the web-research brain of Herbie, a voice assistant. " +
-  "Answer in at most three short sentences that sound natural when spoken aloud, " +
-  "with no markdown, lists, or URLs in the answer. " +
-  "After the answer, write a line containing only SOURCES: " +
-  "followed by up to three source URLs, one per line.";
+  "Make sure to make the answers point-wise and concise. " +
+  "If you are unable to find an answer, say 'I don't know' and do not make up an answer. " +
+  "If the user asks for a web search, use the WebSearch tool to find relevant information. " +
+  "If the user asks for a specific webpage, use the WebFetch tool to retrieve the content of that page. ";
 
 export type ClaudeAnswer = {
   speech: string; // what Herbie says

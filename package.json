@@ -4,7 +4,7 @@
   "description": "Personal AI Assistant",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && vite build",
     "start": "npm run build && electron .",
     "autostart:off": "npm run build && electron . --no-autostart"
   },
@@ -20,7 +20,8 @@
   "devDependencies": {
     "@types/node": "^24.19.0",
     "electron": "^44.4.5",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.1",
