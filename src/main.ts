@@ -3,11 +3,14 @@ import {
   BrowserWindow,
   globalShortcut,
   ipcMain,
+  net,
+  protocol,
   screen,
   session,
 } from "electron";
 import * as path from "node:path";
 import { mkdirSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { uIOhook, UiohookKey } from "uiohook-napi";
 import {
   matchMediaCommand,
@@ -16,6 +19,13 @@ import {
   MEDIA_REPLIES,
 } from "./media.js";
 import { askClaude, needsClaude, stripTrigger } from "./claude.js";
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "app",
+    privileges: { standard: true, secure: true, supportFetchAPI: true },
+  },
+]);
 
 const ORB_SIZE = 140;
 const ORB_MARGIN = 24;
@@ -241,7 +251,8 @@ function createWindow(): BrowserWindow {
   });
 
   // win.loadFile(path.join(__dirname, "../src/renderer/index.html"));
-  win.loadFile(path.join(__dirname, "renderer/index.html"));
+  // win.loadFile(path.join(__dirname, "renderer/index.html"));
+  win.loadURL("app://herbie/index.html");
 
   return win;
 }
@@ -271,6 +282,22 @@ app.whenReady().then(() => {
       callback(allowed);
     },
   );
+
+  const rendererRoot = path.join(__dirname, "renderer");
+
+  protocol.handle("app", (request) => {
+    const { pathname } = new URL(request.url);
+    const filePath = path.normalize(
+      path.join(rendererRoot, decodeURIComponent(pathname)),
+    );
+
+    const relative = path.relative(rendererRoot, filePath);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
 
   const win = createWindow();
 
