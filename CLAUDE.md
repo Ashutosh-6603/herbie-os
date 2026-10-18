@@ -74,4 +74,13 @@
   normalizing), run via PowerShell SendKeys media key codes with execFile; never
   interpolate user text into commands. Silent replies ({ text, silent }).
   Known limits: play/pause is a toggle; Netflix ignores next/previous.
-- Next: v0.5, Claude API for web questions, with routing between local and Claude.
+- Renderer now built with Vite (root src/renderer → dist/renderer, base "./") and
+  served over a custom app:// protocol (protocol.handle in main, path-traversal check),
+  so fetch/WebAssembly work. backgroundThrottling: false.
+- v0.6 DONE (tagged): gesture mode (Ctrl+Alt+G or "gesture mode" by voice/text), off by
+  default; video permission only granted while gesture mode is on; amber inner ring =
+  camera on. MediaPipe GestureRecognizer (GPU, VIDEO mode, 1 hand, ~15 checks/sec),
+  model in src/renderer/public/models, WASM copied by scripts/copy-mediapipe.mjs.
+  GESTURE_ACTIONS map in renderer.js: Open_Palm→playPause, Thumb_Up/Down→volume
+  (repeat while held), Victory→next. Misfire protection: score ≥ 0.75, hold 400ms,
+  re-arm after 500ms gone. Main validates actions with isMediaAction and gestureMode.
