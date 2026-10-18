@@ -95,3 +95,7 @@ export function performMediaAction(action: MediaAction): Promise<void> {
     );
   });
 }
+
+export function isMediaAction(value: string): value is MediaAction {
+  return Object.hasOwn(MEDIA_KEYS, value);
+}

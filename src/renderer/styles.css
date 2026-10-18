@@ -284,3 +284,9 @@ body.camera-on .ring-inner {
 body.camera-on .gesture-label {
   display: block;
 }
+
+body.gesture-fired .core {
+  box-shadow:
+    0 0 60px var(--amber),
+    0 0 120px var(--amber);
+}

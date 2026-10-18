@@ -24,4 +24,6 @@ contextBridge.exposeInMainWorld("herbie", {
       callback(enabled),
     );
   },
+  gestureAction: (action: string) =>
+    ipcRenderer.send("herbie:gesture-action", action),
 });

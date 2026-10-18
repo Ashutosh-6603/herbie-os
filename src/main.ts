@@ -13,6 +13,7 @@ import { mkdirSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { uIOhook, UiohookKey } from "uiohook-napi";
 import {
+  isMediaAction,
   matchMediaCommand,
   normalizeCommand,
   performMediaAction,
@@ -448,6 +449,16 @@ app.whenReady().then(() => {
 
     console.log(`Heard: ${text}`);
     return text;
+  });
+
+  ipcMain.on("herbie:gesture-action", (_event, action: unknown) => {
+    if (typeof action !== "string" || !isMediaAction(action)) return;
+    if (asleep || !gestureMode) return;
+
+    console.log(`Gesture action: ${action}`);
+    performMediaAction(action).catch((err) => {
+      console.error("Gesture action failed:", err);
+    });
   });
 
   let pushToTalkHeld = false;

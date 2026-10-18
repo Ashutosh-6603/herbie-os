@@ -280,13 +280,31 @@ const cameraVideo = document.createElement("video");
 cameraVideo.muted = true;
 cameraVideo.playsInline = true;
 
-// NEW: gesture recognition state
-const GESTURE_INTERVAL_MS = 66; // about 15 checks per second
+const GESTURE_INTERVAL_MS = 66;
 let recognizer = null;
 let gestureTimer = null;
 let lastVideoTime = -1;
 
-// NEW: load MediaPipe's engine and the gesture model (GPU-accelerated)
+const GESTURE_ACTIONS = new Map([
+  ["Open_Palm", { action: "playPause", label: "Play / pause", repeat: false }],
+  ["Thumb_Up", { action: "volumeUp", label: "Volume up", repeat: true }],
+  ["Thumb_Down", { action: "volumeDown", label: "Volume down", repeat: true }],
+  ["Victory", { action: "next", label: "Next track", repeat: false }],
+]);
+
+const MIN_GESTURE_SCORE = 0.75;
+const GESTURE_HOLD_MS = 400;
+const GESTURE_REARM_MS = 500;
+const GESTURE_REPEAT_MS = 800;
+const ACTION_LABEL_MS = 1000;
+
+let candidateGesture = null;
+let candidateSince = 0;
+let firedGesture = null;
+let firedLastSeen = 0;
+let lastFireTime = 0;
+let actionLabelUntil = 0;
+
 async function loadRecognizer() {
   if (recognizer) return;
 
@@ -301,15 +319,63 @@ async function loadRecognizer() {
   });
 }
 
-// NEW: show the top gesture and its confidence under the orb
 function showGesture(top) {
+  if (performance.now() < actionLabelUntil) return;
+
   const label = document.querySelector(".gesture-label");
   label.textContent = top
     ? `${top.categoryName} ${Math.round(top.score * 100)}%`
     : "No hand";
 }
 
-// NEW: check the newest camera frame, then schedule the next check
+function fireGesture(name, now) {
+  const { action, label } = GESTURE_ACTIONS.get(name);
+
+  firedGesture = name;
+  firedLastSeen = now;
+  lastFireTime = now;
+
+  window.herbie.gestureAction(action);
+
+  document.querySelector(".gesture-label").textContent = label;
+  actionLabelUntil = now + ACTION_LABEL_MS;
+
+  document.body.classList.add("gesture-fired");
+  setTimeout(() => document.body.classList.remove("gesture-fired"), 300);
+}
+
+function handleGesture(top) {
+  const now = performance.now();
+  const name = top && top.score >= MIN_GESTURE_SCORE ? top.categoryName : null;
+
+  if (name !== candidateGesture) {
+    candidateGesture = name;
+    candidateSince = now;
+  }
+
+  if (firedGesture && name === firedGesture) {
+    firedLastSeen = now;
+    const { repeat } = GESTURE_ACTIONS.get(name);
+    if (repeat && now - lastFireTime >= GESTURE_REPEAT_MS) {
+      fireGesture(name, now);
+    }
+    return;
+  }
+
+  if (firedGesture && now - firedLastSeen >= GESTURE_REARM_MS) {
+    firedGesture = null;
+  }
+
+  if (
+    !firedGesture &&
+    name &&
+    GESTURE_ACTIONS.has(name) &&
+    now - candidateSince >= GESTURE_HOLD_MS
+  ) {
+    fireGesture(name, now);
+  }
+}
+
 function detectGesture() {
   if (!recognizer || !cameraStream) return;
 
@@ -319,13 +385,14 @@ function detectGesture() {
   ) {
     lastVideoTime = cameraVideo.currentTime;
     const result = recognizer.recognizeForVideo(cameraVideo, performance.now());
-    showGesture(result.gestures[0]?.[0]);
+    const top = result.gestures[0]?.[0];
+    showGesture(top);
+    handleGesture(top);
   }
 
   gestureTimer = setTimeout(detectGesture, GESTURE_INTERVAL_MS);
 }
 
-// CHANGED: also loads the recognizer and starts detecting
 async function startCamera() {
   if (cameraStream) return;
 
@@ -342,13 +409,16 @@ async function startCamera() {
   detectGesture();
 }
 
-// CHANGED: also stops detection and frees the model's GPU memory
 function stopCamera() {
   clearTimeout(gestureTimer);
   gestureTimer = null;
 
   recognizer?.close();
   recognizer = null;
+
+  candidateGesture = null;
+  firedGesture = null;
+  actionLabelUntil = 0;
 
   cameraStream?.getTracks().forEach((track) => track.stop());
   cameraStream = null;
@@ -365,8 +435,8 @@ window.herbie.onGestureMode(async (enabled) => {
       speak("Gesture mode on.");
     } catch (err) {
       console.error(err);
-      stopCamera(); // CHANGED: clean up anything that did start
-      speak("I couldn't start gesture mode."); // CHANGED: covers camera and model failures
+      stopCamera();
+      speak("I couldn't start gesture mode.");
     }
     return;
   }
