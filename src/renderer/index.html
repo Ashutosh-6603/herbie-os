@@ -2,7 +2,10 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'"
+    />
     <title>Herbie</title>
     <link rel="stylesheet" href="styles.css" />
     <script type="module" src="./renderer.js"></script>
@@ -23,6 +26,7 @@
         <div class="core"></div>
       </div>
       <h1 class="status">Initializing...</h1>
+      <div class="gesture-label"></div>
     </div>
   </body>
 </html>

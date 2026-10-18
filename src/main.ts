@@ -241,6 +241,7 @@ function createWindow(): BrowserWindow {
     webPreferences: {
       autoplayPolicy: "no-user-gesture-required",
       preload: path.join(__dirname, "preload.js"),
+      backgroundThrottling: false,
     },
   });
 
@@ -250,8 +251,6 @@ function createWindow(): BrowserWindow {
     win.show();
   });
 
-  // win.loadFile(path.join(__dirname, "../src/renderer/index.html"));
-  // win.loadFile(path.join(__dirname, "renderer/index.html"));
   win.loadURL("app://herbie/index.html");
 
   return win;

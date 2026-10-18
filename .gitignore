@@ -22,3 +22,6 @@ npm-debug.log*
 Thumbs.db
 desktop.ini
 .vscode/
+
+# MediaPipe WebAssembly files
+src/renderer/public/mediapipe/

@@ -1,3 +1,5 @@
+import { FilesetResolver, GestureRecognizer } from "@mediapipe/tasks-vision";
+
 let currentReplyHeight = 0;
 let hasAsked = false;
 let isBusy = false;
@@ -271,11 +273,59 @@ function cancelRecording() {
   document.body.classList.remove("listening");
 }
 
+// ---------- Camera and gesture recognition ----------
+
 let cameraStream = null;
 const cameraVideo = document.createElement("video");
 cameraVideo.muted = true;
 cameraVideo.playsInline = true;
 
+// NEW: gesture recognition state
+const GESTURE_INTERVAL_MS = 66; // about 15 checks per second
+let recognizer = null;
+let gestureTimer = null;
+let lastVideoTime = -1;
+
+// NEW: load MediaPipe's engine and the gesture model (GPU-accelerated)
+async function loadRecognizer() {
+  if (recognizer) return;
+
+  const vision = await FilesetResolver.forVisionTasks("./mediapipe/wasm");
+  recognizer = await GestureRecognizer.createFromOptions(vision, {
+    baseOptions: {
+      modelAssetPath: "./models/gesture_recognizer.task",
+      delegate: "GPU",
+    },
+    runningMode: "VIDEO",
+    numHands: 1,
+  });
+}
+
+// NEW: show the top gesture and its confidence under the orb
+function showGesture(top) {
+  const label = document.querySelector(".gesture-label");
+  label.textContent = top
+    ? `${top.categoryName} ${Math.round(top.score * 100)}%`
+    : "No hand";
+}
+
+// NEW: check the newest camera frame, then schedule the next check
+function detectGesture() {
+  if (!recognizer || !cameraStream) return;
+
+  if (
+    cameraVideo.readyState >= 2 &&
+    cameraVideo.currentTime !== lastVideoTime
+  ) {
+    lastVideoTime = cameraVideo.currentTime;
+    const result = recognizer.recognizeForVideo(cameraVideo, performance.now());
+    showGesture(result.gestures[0]?.[0]);
+  }
+
+  gestureTimer = setTimeout(detectGesture, GESTURE_INTERVAL_MS);
+}
+
+// CHANGED: also loads the recognizer and starts detecting
 async function startCamera() {
   if (cameraStream) return;
 
@@ -286,13 +336,26 @@ async function startCamera() {
   cameraVideo.srcObject = cameraStream;
   await cameraVideo.play();
   document.body.classList.add("camera-on");
+
+  await loadRecognizer();
+  lastVideoTime = -1;
+  detectGesture();
 }
 
+// CHANGED: also stops detection and frees the model's GPU memory
 function stopCamera() {
+  clearTimeout(gestureTimer);
+  gestureTimer = null;
+
+  recognizer?.close();
+  recognizer = null;
+
   cameraStream?.getTracks().forEach((track) => track.stop());
   cameraStream = null;
   cameraVideo.srcObject = null;
+
   document.body.classList.remove("camera-on");
+  document.querySelector(".gesture-label").textContent = "";
 }
 
 window.herbie.onGestureMode(async (enabled) => {
@@ -302,7 +365,8 @@ window.herbie.onGestureMode(async (enabled) => {
       speak("Gesture mode on.");
     } catch (err) {
       console.error(err);
-      speak("I couldn't access the camera.");
+      stopCamera(); // CHANGED: clean up anything that did start
+      speak("I couldn't start gesture mode."); // CHANGED: covers camera and model failures
     }
     return;
   }
@@ -310,6 +374,8 @@ window.herbie.onGestureMode(async (enabled) => {
   stopCamera();
   if (!asleep) speak("Gesture mode off.");
 });
+
+// ---------- Status, push-to-talk, startup ----------
 
 window.herbie.onStatus(async (status) => {
   if (status === "searching") {
@@ -348,7 +414,7 @@ window.herbie.onPushToTalk(async (state) => {
   document.body.classList.toggle("listening", state === "down");
 
   if (state === "down") {
-    window.speechSynthesis.cancel(); // NEW: talking interrupts Herbie
+    window.speechSynthesis.cancel();
     recordingStarted = startRecording();
     return;
   }

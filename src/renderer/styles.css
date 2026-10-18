@@ -266,3 +266,21 @@ body.camera-on .ring-inner {
   border-color: var(--amber);
   box-shadow: 0 0 12px var(--amber);
 }
+
+.gesture-label {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--amber);
+  text-shadow: 0 0 6px var(--amber);
+  pointer-events: none;
+}
+
+body.camera-on .gesture-label {
+  display: block;
+}
