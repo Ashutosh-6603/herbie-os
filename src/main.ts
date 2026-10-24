@@ -114,15 +114,15 @@ function getBarBounds(replyHeight: number) {
   };
 }
 
-// NEW: can we reach Anthropic? (any response counts; only a network failure means offline)
 async function isOnline(): Promise<boolean> {
   try {
     await fetch("https://api.anthropic.com", {
       method: "HEAD",
-      signal: AbortSignal.timeout(3_000),
+      signal: AbortSignal.timeout(5_000),
     });
     return true;
-  } catch {
+  } catch (err) {
+    console.error("Online check failed:", err);
     return false;
   }
 }

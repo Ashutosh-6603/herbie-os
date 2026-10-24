@@ -290,8 +290,8 @@ const GESTURE_ACTIONS = new Map([
   ["Victory", { action: "next", label: "Next track", repeat: false }],
 ]);
 
-const MIN_GESTURE_SCORE = 0.75;
-const GESTURE_HOLD_MS = 400;
+const MIN_GESTURE_SCORE = 0.7;
+const GESTURE_HOLD_MS = 300;
 const GESTURE_REARM_MS = 500;
 const GESTURE_REPEAT_MS = 800;
 const ACTION_LABEL_MS = 1000;
