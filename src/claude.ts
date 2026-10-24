@@ -1,31 +1,27 @@
 import { execFile, type ExecFileException } from "node:child_process";
 
 const CLAUDE_MODEL = "haiku";
+const CLAUDE_EFFORT = "low";
+const CLAUDE_MAX_TURNS = 6;
 const CLAUDE_TIMEOUT_MS = 90_000;
 
-// Questions starting with these go to Claude, and the phrase is removed
 const TRIGGER = /^\s*(search(\s+for)?|look\s+up|lookup|google)\b[\s,:]*/i;
 
-// Questions containing these words go to Claude
-// const WEB_KEYWORDS =
-//   /\b(news|latest|today|current|currently|recent|stocks?|share\s+price|market|sensex|nifty)\b/i;
-
-const CLAUDE_INSTRUCTIONS =
-  "You are the web-research brain of Herbie, a voice assistant. " +
-  "Make sure to make the answers point-wise and concise. " +
-  "If you are unable to find an answer, say 'I don't know' and do not make up an answer. " +
-  "If the user asks for a web search, use the WebSearch tool to find relevant information. " +
-  "If the user asks for a specific webpage, use the WebFetch tool to retrieve the content of that page. ";
+function buildInstructions(userName: string): string {
+  return (
+    `You are Herbie, a voice desktop assistant for ${userName}. ` +
+    "Answer in at most three short sentences that sound natural when spoken aloud, " +
+    "with no markdown, lists, or URLs in the answer. " +
+    "Use web search only when the question needs current or recent information. " +
+    "If you used web sources, after the answer write a line containing only SOURCES: " +
+    "followed by up to three source URLs, one per line."
+  );
+}
 
 export type ClaudeAnswer = {
-  speech: string; // what Herbie says
-  display: string; // what Herbie shows (answer + sources)
+  speech: string;
+  display: string;
 };
-
-export function needsClaude(prompt: string): boolean {
-  return TRIGGER.test(prompt);
-  //   return TRIGGER.test(prompt) || WEB_KEYWORDS.test(prompt);
-}
 
 export function stripTrigger(prompt: string): string {
   return prompt.replace(TRIGGER, "").trim() || prompt.trim();
@@ -45,6 +41,7 @@ function parseAnswer(output: string): ClaudeAnswer {
 export function askClaude(
   input: string,
   workspace: string,
+  userName: string,
 ): Promise<ClaudeAnswer> {
   return new Promise((resolve, reject) => {
     const child = execFile(
@@ -53,10 +50,15 @@ export function askClaude(
         "-p",
         "--model",
         CLAUDE_MODEL,
+        "--effort",
+        CLAUDE_EFFORT,
+        "--max-turns",
+        String(CLAUDE_MAX_TURNS),
+        "--no-session-persistence",
         "--allowedTools",
         "WebSearch,WebFetch",
         "--append-system-prompt",
-        CLAUDE_INSTRUCTIONS,
+        buildInstructions(userName),
       ],
       {
         cwd: workspace,

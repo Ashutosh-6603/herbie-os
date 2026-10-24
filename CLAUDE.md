@@ -84,3 +84,21 @@
   GESTURE_ACTIONS map in renderer.js: Open_Palm→playPause, Thumb_Up/Down→volume
   (repeat while held), Victory→next. Misfire protection: score ≥ 0.75, hold 400ms,
   re-arm after 500ms gone. Main validates actions with isMediaAction and gestureMode.
+
+## Roadmap (after v0.6)
+
+1. Brain: lazy-load Ollama (no boot warm-up, unload after 5 min idle). Later: brain
+   choice becomes a setting (local first / Claude for everything / local only).
+2. Transcription accuracy: vocabulary hint (initial prompt), bigger Whisper model,
+   GPU if needed. Problems: accent, names/terms, background noise, distance.
+3. Full player control: Herbie browser extension (Chromium) controls the playing video
+   on any tab: play/pause, seek ±N s, mute, speed. Site adapters for next episode and
+   Netflix (needs its internal player API to seek). Talks to a local Herbie server
+   (127.0.0.1 only, Origin check + token), the same server later used by the phone.
+4. Transcription upgrade (English only): compare whisper-small.en and distil English
+   models on CPU, loaded only while needed; vocabulary hint.
+5. v1.0 Windows installer (electron-builder).
+6. Linux port: adapters for media (playerctl/MPRIS), autostart (systemd), hotkeys and
+   keyboard hook under Wayland, claude path.
+7. Herbie-OS: minimal Linux desktop built around Herbie, then an installable ISO.
+   Side quests anytime: swipe gestures, custom shapes, cursor control + drag.

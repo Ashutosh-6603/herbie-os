@@ -125,8 +125,10 @@ function closeBar() {
 
 function getErrorMessage(err) {
   const message = String(err?.message ?? "");
-  if (message.includes("OLLAMA_DOWN")) {
-    return "My local brain isn't running. Please start Ollama.";
+
+  // NEW
+  if (message.includes("OFFLINE")) {
+    return "I'm offline, so I can't answer questions right now. I can still control media.";
   }
 
   if (message.includes("STT_DOWN")) {
@@ -134,19 +136,15 @@ function getErrorMessage(err) {
   }
 
   if (message.includes("CLAUDE_MISSING")) {
-    return "I can't search the web because Claude Code isn't installed.";
+    return "I can't answer questions because Claude Code isn't installed.";
   }
 
   if (message.includes("CLAUDE_TIMEOUT")) {
-    return "The web search took too long. Try again in a moment.";
+    return "That took too long. Try again in a moment.";
   }
 
   if (message.includes("CLAUDE_FAILED")) {
-    return "The web search failed. Check that you're signed in to Claude Code.";
-  }
-
-  if (message.toLowerCase().includes("timeout")) {
-    return "My local brain is taking too long to respond. Try again in a moment.";
+    return "Something went wrong. Check that you're signed in to Claude Code.";
   }
 
   return "Sorry, something went wrong while thinking about that.";
@@ -448,9 +446,9 @@ window.herbie.onGestureMode(async (enabled) => {
 // ---------- Status, push-to-talk, startup ----------
 
 window.herbie.onStatus(async (status) => {
-  if (status === "searching") {
-    showReply(`"${currentPrompt}"\nSearching the web...`);
-    speak("Let me look that up.");
+  if (status === "thinking") {
+    showReply(`"${currentPrompt}"\nThinking...`);
+    speak("One moment.");
     return;
   }
 
@@ -470,10 +468,11 @@ window.herbie.onStatus(async (status) => {
     speak("I'm back.");
 
     const ready = await window.herbie.waitForBrain();
+
     speak(
       ready
-        ? "My local brain is online."
-        : "I couldn't start my local brain. Please check that Ollama is running.",
+        ? "I'm connected and ready."
+        : "I'm offline. I can still control media.",
     );
   }
 });
@@ -509,8 +508,8 @@ async function announceBrain() {
 
   speak(
     ready
-      ? "My local brain is online. Ask me anything."
-      : "I couldn't start my local brain. Please check that Ollama is running.",
+      ? "I'm connected and ready. Ask me anything."
+      : "I'm offline. I can still control media.",
   );
 }
 

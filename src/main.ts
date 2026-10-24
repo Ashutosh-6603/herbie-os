@@ -19,7 +19,7 @@ import {
   performMediaAction,
   MEDIA_REPLIES,
 } from "./media.js";
-import { askClaude, needsClaude, stripTrigger } from "./claude.js";
+import { askClaude, stripTrigger } from "./claude.js"; // CHANGED: needsClaude removed
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -36,22 +36,12 @@ const BAR_GAP = 12;
 const REPLY_GAP = 12;
 const MAX_REPLY_HEIGHT = 240;
 
-const OLLAMA_BASE_URL = "http://localhost:11434";
-const OLLAMA_MODEL = "llama3.2";
-const OLLAMA_KEEP_ALIVE = "30m";
-const OLLAMA_CONTEXT = 16384;
 const MAX_PROMPT_LENGTH = 2000;
-
 const USER_NAME = "Ashutosh";
 const MAX_HISTORY_MESSAGES = 60;
-const SYSTEM_PROMPT =
-  `You are Herbie, a helpful desktop assistant for ${USER_NAME}. ` +
-  "Keep answers short, one to three sentences, because they are spoken aloud. " +
-  "Don't end your answers with follow-up questions unless you need more information.";
 
 const PUSH_TO_TALK_KEY = UiohookKey.CtrlRight;
 const SLEEP_SHORTCUT = "CommandOrControl+Alt+H";
-
 const GESTURE_SHORTCUT = "CommandOrControl+Alt+G";
 
 const GESTURE_COMMANDS = new Map<string, "on" | "off" | "toggle">([
@@ -70,7 +60,7 @@ const STT_MODEL = "Xenova/whisper-base.en";
 const MAX_RECORDING_SAMPLES = 16000 * 30;
 
 type ChatMessage = {
-  role: "system" | "user" | "assistant";
+  role: "user" | "assistant";
   content: string;
 };
 
@@ -124,59 +114,16 @@ function getBarBounds(replyHeight: number) {
   };
 }
 
-async function isOllamaUp(): Promise<boolean> {
+// NEW: can we reach Anthropic? (any response counts; only a network failure means offline)
+async function isOnline(): Promise<boolean> {
   try {
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/version`, {
+    await fetch("https://api.anthropic.com", {
+      method: "HEAD",
       signal: AbortSignal.timeout(3_000),
     });
-    return response.ok;
+    return true;
   } catch {
     return false;
-  }
-}
-
-async function warmUpOllama(): Promise<boolean> {
-  try {
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages: [],
-        keep_alive: OLLAMA_KEEP_ALIVE,
-        options: { num_ctx: OLLAMA_CONTEXT },
-      }),
-      signal: AbortSignal.timeout(120_000),
-    });
-
-    if (!response.ok) {
-      console.error(`Ollama warm-up failed: HTTP ${response.status}`);
-      return false;
-    }
-
-    console.log("Ollama warm-up complete");
-    return true;
-  } catch (err) {
-    console.error("Ollama warm-up failed:", err);
-    return false;
-  }
-}
-
-async function unloadOllama(): Promise<void> {
-  try {
-    await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        messages: [],
-        keep_alive: 0,
-      }),
-      signal: AbortSignal.timeout(5_000),
-    });
-    console.log("Ollama model unloaded");
-  } catch (err) {
-    console.error("Ollama unload failed:", err);
   }
 }
 
@@ -195,28 +142,6 @@ async function loadTranscriber(): Promise<Transcriber | null> {
     console.error("Speech-to-text failed to load:", err);
     return null;
   }
-}
-
-async function askOllama(messages: ChatMessage[]): Promise<string> {
-  const response = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: OLLAMA_MODEL,
-      stream: false,
-      keep_alive: OLLAMA_KEEP_ALIVE,
-      options: { num_ctx: OLLAMA_CONTEXT },
-      messages,
-    }),
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Ollama returned HTTP ${response.status}`);
-  }
-
-  const data = (await response.json()) as { message: { content: string } };
-  return data.message.content;
 }
 
 function setAutostart(enabled: boolean): void {
@@ -307,7 +232,7 @@ app.whenReady().then(() => {
     console.log(`Gesture mode ${enabled ? "on" : "off"}`);
   }
 
-  let brainReady = warmUpOllama();
+  let brainReady = isOnline(); // CHANGED: "ready" now means "can reach Claude"
   let transcriberReady = loadTranscriber();
   let asleep = false;
 
@@ -350,8 +275,8 @@ app.whenReady().then(() => {
     win.setBounds(getBarBounds(safeHeight));
   });
 
-  ipcMain.on("herbie:quit", async () => {
-    await unloadOllama();
+  // CHANGED: nothing to unload anymore
+  ipcMain.on("herbie:quit", () => {
     app.quit();
   });
 
@@ -384,41 +309,25 @@ app.whenReady().then(() => {
       };
     }
 
-    if (needsClaude(question)) {
-      win.webContents.send("herbie:status", "searching");
-
-      if (gestureMode) setGestureMode(false);
-      win.hide();
-
-      const context = recentContext();
-      const cleaned = stripTrigger(question);
-      const input = context
-        ? `Conversation so far:\n${context}\n\nNew question: ${cleaned}`
-        : cleaned;
-
-      console.log(`You (web): ${question}`);
-      const answer = await askClaude(input, claudeWorkspace);
-      console.log(`Claude: ${answer.speech}`);
-
-      rememberExchange(question, answer.speech);
-      return { text: answer.display, speech: answer.speech, silent: false };
+    // 3. CHANGED: everything else goes to Claude
+    if (!(await isOnline())) {
+      throw new Error("OFFLINE");
     }
 
-    if (!(await isOllamaUp())) {
-      throw new Error("OLLAMA_DOWN");
-    }
+    win.webContents.send("herbie:status", "thinking");
 
-    const reply = await askOllama([
-      { role: "system", content: SYSTEM_PROMPT },
-      ...history,
-      { role: "user", content: question },
-    ]);
-
-    rememberExchange(question, reply);
+    const context = recentContext();
+    const cleaned = stripTrigger(question);
+    const input = context
+      ? `Conversation so far:\n${context}\n\nNew question: ${cleaned}`
+      : cleaned;
 
     console.log(`You: ${question}`);
-    console.log(`Herbie: ${reply}`);
-    return { text: reply, silent: false };
+    const answer = await askClaude(input, claudeWorkspace, USER_NAME);
+    console.log(`Claude: ${answer.speech}`);
+
+    rememberExchange(question, answer.speech);
+    return { text: answer.display, speech: answer.speech, silent: false };
   });
 
   ipcMain.handle("herbie:wait-for-brain", () => brainReady);
@@ -482,19 +391,19 @@ app.whenReady().then(() => {
     asleep = true;
     pushToTalkHeld = false;
     win.webContents.send("herbie:status", "sleeping");
+    if (gestureMode) setGestureMode(false);
     win.hide();
 
     const transcriber = await transcriberReady;
     transcriberReady = Promise.resolve(null);
     await transcriber?.dispose?.();
 
-    await unloadOllama();
     console.log("Herbie is asleep");
   }
 
   function wakeUp(): void {
     asleep = false;
-    brainReady = warmUpOllama();
+    brainReady = isOnline(); // CHANGED
     transcriberReady = loadTranscriber();
     win.showInactive();
     win.webContents.send("herbie:status", "waking");
