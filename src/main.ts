@@ -293,7 +293,7 @@ app.whenReady().then(() => {
 
     const mediaAction = matchMediaCommand(question);
     if (mediaAction) {
-      console.log(`Command: ${mediaAction}` + Date.now());
+      console.log(`Command: ${mediaAction}`);
       await performMediaAction(mediaAction);
       return { text: MEDIA_REPLIES[mediaAction], silent: true };
     }
@@ -364,7 +364,7 @@ app.whenReady().then(() => {
     if (typeof action !== "string" || !isMediaAction(action)) return;
     if (asleep || !gestureMode) return;
 
-    console.log(`Gesture action: ${action}`);
+    console.log(`Gesture action: ${action}` + Date.now());
     performMediaAction(action).catch((err) => {
       console.error("Gesture action failed:", err);
     });
