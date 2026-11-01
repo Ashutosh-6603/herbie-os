@@ -293,7 +293,7 @@ app.whenReady().then(() => {
 
     const mediaAction = matchMediaCommand(question);
     if (mediaAction) {
-      console.log(`Command: ${mediaAction}`);
+      console.log(`Command: ${mediaAction}` + Date.now());
       await performMediaAction(mediaAction);
       return { text: MEDIA_REPLIES[mediaAction], silent: true };
     }
