@@ -70,7 +70,14 @@ export function askClaude(
         if (err) {
           if (err.code === "ENOENT") return reject(new Error("CLAUDE_MISSING"));
           if (err.killed) return reject(new Error("CLAUDE_TIMEOUT"));
-          console.error("Claude failed:", stderr || err.message);
+
+          console.error("Claude failed:", {
+            exitCode: err.code,
+            signal: err.signal,
+            stderr,
+            stdout,
+          });
+
           return reject(new Error("CLAUDE_FAILED"));
         }
         resolve(parseAnswer(stdout));

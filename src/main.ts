@@ -9,7 +9,8 @@ import {
   session,
 } from "electron";
 import * as path from "node:path";
-import { mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { inspect } from "node:util";
 import { pathToFileURL } from "node:url";
 import { uIOhook, UiohookKey } from "uiohook-napi";
 import {
@@ -27,6 +28,41 @@ protocol.registerSchemesAsPrivileged([
     privileges: { standard: true, secure: true, supportFetchAPI: true },
   },
 ]);
+
+const LOG_DIR = path.join(app.getPath("userData"), "logs");
+mkdirSync(LOG_DIR, { recursive: true });
+const LOG_FILE = path.join(LOG_DIR, "main.log");
+
+function writeLog(level: string, args: unknown[]): void {
+  const message = args
+    .map((a) => (typeof a === "string" ? a : inspect(a, { depth: 4 })))
+    .join(" ");
+  try {
+    appendFileSync(
+      LOG_FILE,
+      `${new Date().toISOString()} [${level}] ${message}\n`,
+    );
+  } catch {
+    // never let logging crash Herbie
+  }
+}
+
+const originalLog = console.log;
+const originalError = console.error;
+console.log = (...args: unknown[]) => {
+  originalLog(...args);
+  writeLog("info", args);
+};
+console.error = (...args: unknown[]) => {
+  originalError(...args);
+  writeLog("error", args);
+};
+
+console.log("Herbie starting", {
+  packaged: app.isPackaged,
+  cwd: process.cwd(),
+  PATH: process.env.PATH,
+});
 
 const ORB_SIZE = 140;
 const ORB_MARGIN = 24;
