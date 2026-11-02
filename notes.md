@@ -1,0 +1,4 @@
+- Kernel Learn
+- GNU
+- KDE Connect
+- parsec/ moonlight/ sunshine

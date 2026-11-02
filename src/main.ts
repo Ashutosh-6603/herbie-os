@@ -364,7 +364,13 @@ app.whenReady().then(() => {
     if (typeof action !== "string" || !isMediaAction(action)) return;
     if (asleep || !gestureMode) return;
 
-    console.log(`Gesture action: ${action}` + Date.now());
+    const time = new Date().toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      fractionalSecondDigits: 3,
+    });
+    console.log(`[${time}] Gesture action: ${action}`);
     performMediaAction(action).catch((err) => {
       console.error("Gesture action failed:", err);
     });
