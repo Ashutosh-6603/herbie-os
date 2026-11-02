@@ -9,7 +9,15 @@ import {
   session,
 } from "electron";
 import * as path from "node:path";
-import { appendFileSync, mkdirSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { randomBytes } from "node:crypto"; // NEW
+import { startServer, type HerbieServer } from "./server.js"; // NEW
 import { inspect } from "node:util";
 import { pathToFileURL } from "node:url";
 import { uIOhook, UiohookKey } from "uiohook-napi";
@@ -192,6 +200,19 @@ function setAutostart(enabled: boolean): void {
   app.setLoginItemSettings(settings);
 }
 
+function loadOrCreatePairingToken(): string {
+  const file = path.join(app.getPath("userData"), "pairing-token.txt");
+
+  if (existsSync(file)) {
+    return readFileSync(file, "utf8").trim();
+  }
+
+  const token = randomBytes(32).toString("base64url");
+  writeFileSync(file, token);
+  console.log(`Created pairing token at ${file}`);
+  return token;
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     ...getOrbBounds(),
@@ -277,6 +298,15 @@ app.whenReady().then(() => {
     "claude-workspace",
   );
   mkdirSync(claudeWorkspace, { recursive: true });
+
+  let herbieServer: HerbieServer | null = null;
+  startServer(loadOrCreatePairingToken())
+    .then((server) => {
+      herbieServer = server;
+    })
+    .catch((err) => {
+      console.error("Herbie server failed to start:", err);
+    });
 
   ipcMain.on("herbie:shrink", () => {
     win.setAlwaysOnTop(true, "floating");
@@ -479,6 +509,7 @@ app.whenReady().then(() => {
   app.on("will-quit", () => {
     uIOhook.stop();
     globalShortcut.unregisterAll();
+    herbieServer?.close();
   });
 });
 

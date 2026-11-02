@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Herbie Media Control",
+  "version": "0.1.0",
+  "description": "Lets Herbie control video playback in the browser.",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage", "alarms"],
+  "options_page": "options.html"
+}
